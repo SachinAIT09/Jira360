@@ -26,9 +26,21 @@ Files:
 | File | What it is |
 |---|---|
 | `public/index.html` | The page (the only thing that is published) |
-| `app.js` | The server logic: talks to Jira with the API token |
+| `app.js` | The server: wires the routes together. Talks to Jira with the API token |
+| `lib/jira.js` | Jira client, lookups, and the cached lists the form shows |
+| `lib/sync.js` | Creates/updates tickets, moves status, adds comments and work logs (the only code that writes to Jira) |
+| `lib/check.js` | Checks a task against Jira before sending (the preview) |
+| `lib/bulk.js` | Reads Excel / CSV uploads |
+| `lib/store.js` | Remembers things across restarts (see "Storage" below) |
+| `routes/` | The web addresses: `ui.js` (the page), `portal.js` (the portal), `jira.js` (Jira webhook) |
 | `server.js` | Runs `app.js` on your computer (`npm start`) |
 | `netlify/functions/api.mjs`, `netlify.toml` | Runs `app.js` on Netlify |
+
+### Storage
+
+The server remembers which Jira ticket belongs to each task, and which portal events it has already handled, so a resend after a restart doesn't create a duplicate.
+- On your computer it keeps these in the `data/` folder (not uploaded to git).
+- On Netlify it uses Netlify Blobs. Run `npm install @netlify/blobs` once before deploying. Without it the server falls back to temporary storage that is lost whenever Netlify restarts the function.
 
 Why it isn't a standalone .html file: Jira blocks API calls made directly from a web page, and the API token would be visible to anyone who opens the page. The page talks to `app.js`, which holds the token.
 
@@ -172,7 +184,7 @@ Call `pushTaskToJira(task)` after save and store the returned `jiraKey` on the t
 3. The portal receives `{ taskId, jiraKey, status }` signed with `X-Jira-Signature` (HMAC-SHA256, same shared secret).
 
 ### Deploy
-Any place that runs Node: a small VM, container (Cloud Run / ECS / AKS), or an existing internal server. One instance is fine; if you run more than one, move the idempotency map in `server.js` to Redis.
+Any place that runs Node: a small VM, container (Cloud Run / ECS / AKS), or an existing internal server. One instance is fine; if you run more than one, note that `data/` is per machine: point `lib/store.js` at a shared store (Redis, Netlify Blobs) instead.
 
 ### Troubleshooting
 | Symptom | Likely cause |
