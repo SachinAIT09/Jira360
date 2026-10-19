@@ -106,8 +106,29 @@ document.addEventListener('visibilitychange', () => { if (loaded && document.vis
 $('taskId').addEventListener('change', pullFromJira);
 $('jiraKey').addEventListener('change', pullFromJira);
 
+// ---------- Log work: the "Set to" / "Reduce by" boxes are only active when chosen ----------
+function syncEstimateInputs() {
+  const choice = document.querySelector('input[name=adjustEstimate]:checked')?.value;
+  $('newEstimate').disabled = choice !== 'new';
+  $('reduceBy').disabled = choice !== 'manual';
+}
+for (const r of document.querySelectorAll('input[name=adjustEstimate]')) r.addEventListener('change', () => {
+  syncEstimateInputs();
+  const box = { new: 'newEstimate', manual: 'reduceBy' }[r.value];
+  if (box) $(box).focus();
+});
+function clearLogWork() {
+  for (const id of ['timeSpent', 'workDate', 'newEstimate', 'reduceBy', 'worklogNote']) $(id).value = '';
+  document.querySelector('input[name=adjustEstimate][value=auto]').checked = true;
+  syncEstimateInputs();
+}
+// The remaining-estimate choice in words (review dialog, Inbox)
+function estimateText(t) {
+  return { leave: 'Leave unchanged', new: `Set to ${t.newEstimate}`, manual: `Reduce by ${t.reduceBy}` }[t.adjustEstimate] || 'Adjust automatically';
+}
+
 $('clear').addEventListener('click', () => {
-  $('f').reset(); $('msg').className = 'msg';
+  $('f').reset(); $('msg').className = 'msg'; syncEstimateInputs();
   pickers.labels.clear(); pickers.fixVersions.clear();
   forgetTicket(); setSync(''); showParentInfo();
 });
@@ -117,13 +138,15 @@ const LABELS = {
   title: 'Title', description: 'Description', assigneeId: 'Assignee', assigneeEmail: 'Assignee', parentKey: 'Parent ticket',
   startDate: 'Start date', dueDate: 'End date', originalEstimate: 'Original estimate', sprint: 'Sprint',
   labels: 'Labels', fixVersions: 'Fix version', priority: 'Priority', status: 'Status',
-  comment: 'Comment', hoursSpent: 'Log work',
+  comment: 'Comment', hoursSpent: 'Log work', timeSpent: 'Time spent', workDate: 'Started', adjustEstimate: 'Remaining estimate',
+  worklogNote: 'Work description',
 };
 function shownValue(k, v, info) {
   if ((k === 'assigneeId' || k === 'assigneeEmail') && info.assigneeName) return info.assigneeName;
   if (k === 'parentKey' && info.parentSummary) return `${v}: ${info.parentSummary}`;
   if (k === 'status') return info.statusName || v;
   if (k === 'hoursSpent') return `${v} hours`;
+  if (k === 'workDate') return new Date(v).toLocaleString();
   return v;
 }
 const noteList = (kind, title, items) => items.length
@@ -142,6 +165,10 @@ $('f').addEventListener('submit', async e => {
   const data = {};
   for (const [k, v] of new FormData($('f'))) { const t = String(v).trim(); if (t) data[k] = t; }
   if (data.hoursSpent) data.hoursSpent = Number(data.hoursSpent);
+  // Log work goes with a time spent only; "Date started" is sent as a full date-time (this computer's time zone)
+  if (!data.timeSpent) for (const k of ['adjustEstimate', 'newEstimate', 'reduceBy', 'worklogNote']) delete data[k];
+  else if ($('workDate').value) data.workDate = new Date($('workDate').value).toISOString();
+  if (data.adjustEstimate === 'auto') delete data.adjustEstimate; // Jira's default
   // An existing ticket can be updated by its Jira key alone. A new one gets a Task ID if none was
   // given: it's how the ticket is found again later (shown in the form after sending).
   if (!data.taskId) data.taskId = data.jiraKey ? data.jiraKey.toUpperCase()
@@ -177,7 +204,8 @@ $('f').addEventListener('submit', async e => {
 const PV_SECTIONS = [
   ['Details', ['title', 'description', 'assigneeId', 'assigneeEmail', 'parentKey']],
   ['Planning', ['startDate', 'dueDate', 'originalEstimate', 'sprint', 'labels', 'fixVersions', 'priority']],
-  ['Status and work', ['status', 'comment', 'hoursSpent']],
+  ['Status and comment', ['status', 'comment']],
+  ['Log work', ['timeSpent', 'hoursSpent', 'workDate', 'adjustEstimate', 'worklogNote']],
 ];
 function currentValue(k, info) {
   const c = info.current;
@@ -187,7 +215,7 @@ function currentValue(k, info) {
 }
 function pvRow(k, task, info) {
   const removed = (task.clear || []).includes(k);
-  const now = removed ? '' : shownValue(k, task[k], info);
+  const now = removed ? '' : k === 'adjustEstimate' ? estimateText(task) : shownValue(k, task[k], info);
   const was = currentValue(k, info);
   // Labels / versions without replaceLists are added to what the ticket has
   const after = (k === 'labels' || k === 'fixVersions') && was && !task.replaceLists
@@ -235,9 +263,9 @@ $('pvGo').addEventListener('click', async () => {
     sent();
     $('jiraKey').value = out.jiraKey;
     $('taskId').value = task.taskId;
-    $('comment').value = ''; $('hoursSpent').value = '';
+    $('comment').value = ''; clearLogWork();
     loaded = null; pullFromJira(); // reload everything from Jira, including what was just sent
-    show('ok', `Done: ${link(out.url, out.jiraKey)} (${esc(out.actions.join(', ') || 'no changes')})` +
+    show('ok', `Done: ${link(out.url, out.jiraKey)} (${esc(out.actions.map(actionText).join(', ') || 'no changes')})` +
       (out.warning ? `<br>Note: ${esc(out.warning)}` : ''));
   } catch (err) {
     show('err', 'Failed: ' + esc(err.message));

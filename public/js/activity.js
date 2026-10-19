@@ -2,7 +2,7 @@
 
 // ---------- Activity: everything sent to Jira, for everyone (kept on the server) ----------
 let acts = { items: [], next: '', more: false };
-const SOURCE_NAMES = { ui: 'Form', bulk: 'Bulk upload', portal: 'Portal', sheet: 'Google Sheet' };
+const SOURCE_NAMES = { ui: 'Form', bulk: 'Bulk upload', portal: 'Portal', sheet: 'Google Sheet', jira: 'Jira' };
 const FIELD_NAMES = { ...LABELS, assignee: 'Assignee', hoursSpent: 'Work logged' };
 function ashow(kind, html) { const m = $('amsg'); m.className = 'msg ' + kind; m.innerHTML = html; }
 const sourceText = e => (SOURCE_NAMES[e.source] || e.source) + (e.via === 'inbox' ? ' (approved in Inbox)' : '');
@@ -11,6 +11,9 @@ function actionText(a) {
   if (a === 'created') return 'Created';
   if (a === 'updated') return 'Updated';
   if (a === 'commented') return 'Comment added';
+  if (a === 'sheet-updated') return 'Sheet row updated from Jira';
+  if (a === 'conflict') return 'Changed in both places: newer sheet change kept';
+  if (a === 'row-removed') return 'Row removed from the sheet: no longer synced';
   if (a.startsWith('transitioned:')) return 'Status → ' + a.slice(13);
   if (a.startsWith('worklog:')) return 'Logged ' + a.slice(8);
   return a;

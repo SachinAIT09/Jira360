@@ -1,5 +1,5 @@
-// Optional reverse sync: Jira changes on portal tickets are sent back to PORTAL_CALLBACK_URL, and
-// status / end date / assignee changes are written into the Google Sheet row (when the sheet is set up).
+// Optional reverse sync: Jira changes on portal tickets are sent back to PORTAL_CALLBACK_URL, and the
+// ticket's Google Sheet row is synced at once (when the sheet is set up; otherwise within a minute).
 // In Jira, add a webhook for "Issue updated" and "Comment created" pointing to
 //   https://<host>/jira/webhook?secret=<JIRA_WEBHOOK_SECRET>
 //
@@ -13,7 +13,7 @@ import express from 'express';
 import { JIRA_WEBHOOK_SECRET, PORTAL_CALLBACK_URL, PORTAL_SHARED_SECRET } from '../lib/config.js';
 import { jira, whoAmI, adfToText } from '../lib/jira.js';
 import { log, logError } from '../lib/log.js';
-import { isSheetConfigured, jiraChangedToSheet } from '../lib/sheet.js';
+import { isSheetConfigured, syncOne } from '../lib/sheet.js';
 
 const router = express.Router();
 export default router;
@@ -68,7 +68,7 @@ router.post('/jira/webhook', async (req, res) => {
     const taskId = await portalTaskId(issue);
     if (!taskId) return; // not a ticket the portal created
     if (PORTAL_CALLBACK_URL) await toPortal({ taskId, jiraKey: issue.key, ...payload });
-    if (payload.changes) await jiraChangedToSheet(taskId, payload.changes);
+    if (isSheetConfigured()) await syncOne([issue.key, taskId]); // the row follows straight away (the timer would within a minute)
     log('jira-webhook', { taskId, jiraKey: issue.key, event: payload.event, ...(payload.changes && { changes: payload.changes }) });
   } catch (e) {
     logError('jira-webhook', e, { jiraKey: issue?.key });

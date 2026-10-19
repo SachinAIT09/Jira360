@@ -68,8 +68,12 @@ function sent() { if (!$('activityPanel').hidden) loadActivity(); }
 
 // ---------- Tabs ----------
 const TABS = { single: ['tabSingle', 'singlePanel'], bulk: ['tabBulk', 'bulkPanel'], inbox: ['tabInbox', 'inboxPanel'], activity: ['tabActivity', 'activityPanel'], settings: ['tabSettings', 'settingsPanel'] };
-function showTab(name) {
+// Each section has its own address (#inbox, #settings…), so links, refresh and Back/Forward work.
+// how: 'push' (a click: a new history entry), 'replace' (opening the page), 'none' (Back/Forward)
+const tabFromHash = () => (TABS[location.hash.slice(1)] ? location.hash.slice(1) : '');
+function showTab(name, how = 'push') {
   if (!TABS[name]) name = 'single';
+  if (how !== 'none' && location.hash.slice(1) !== name) history[how === 'replace' ? 'replaceState' : 'pushState'](null, '', '#' + name);
   for (const [k, [tab, panel]] of Object.entries(TABS)) {
     $(panel).hidden = k !== name;
     $(tab).setAttribute('aria-selected', String(k === name));
@@ -81,6 +85,7 @@ function showTab(name) {
   if (name === 'settings') loadSettings();
 }
 for (const name of Object.keys(TABS)) $(TABS[name][0]).addEventListener('click', () => showTab(name));
+window.addEventListener('popstate', () => showTab(tabFromHash() || 'single', 'none'));
 
 // ---------- Lists from Jira (people, epics, sprints, versions, labels, priorities, statuses) ----------
 let opts = { users: [], parents: [], sprints: [], versions: [], labels: [], priorities: [], statuses: [] };

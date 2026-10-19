@@ -36,7 +36,7 @@ Files:
 | `lib/activity.js`, `lib/inbox.js` | The Activity history, and changes waiting for approval |
 | `lib/fields.js` | Jira's field list for the project, and which fields the form shows |
 | `lib/ai.js` | AI suggestions (optional) |
-| `lib/google.js`, `lib/sheet.js` | Google Sheet sync (optional) |
+| `lib/google.js`, `lib/sheet.js`, `lib/sheet-layout.js` | Google Sheet sync, making the sheet, and its preview (optional) |
 | `routes/` | The web addresses: `ui.js` (the page), `portal.js` (the portal), `jira.js` (Jira webhook) |
 | `server.js` | Runs `app.js` on your computer (`npm start`) |
 | `netlify/functions/api.mjs`, `netlify.toml` | Runs `app.js` on Netlify |
@@ -47,6 +47,12 @@ Files:
 - **Latest in Jira** (under the key) lists the ticket's last comments and logged work.
 - **Review and send** opens a dialog grouped into Details / Planning / Status and work / More fields. For an existing ticket each line shows what the ticket has now → what it will have; removed values are red.
 - Shortcuts: **Ctrl+Enter** reviews (and in the dialog, confirms), **Esc** goes back, **/** jumps to the Task ID.
+- **Log work** works like Jira's "Log work" box:
+  - **Time spent** in Jira's format: `2h 30m`, `1d 4h`, `45m`, `1w`. A plain number means hours. Jira applies its own hours-per-day setting to `d` and `w`.
+  - **Date started**: empty means now.
+  - **Remaining estimate**: adjust automatically (Jira's default), leave unchanged, set to a value, or reduce by a value.
+  - **Work description**: empty uses the comment above.
+  - It is sent only when a time is filled in, and appears in the review and the history.
 
 ### Fields on the form
 
@@ -79,20 +85,50 @@ The AI only suggests: it chooses only from Jira's real people, epics, sprints, p
 Setup: `npm install @anthropic-ai/sdk`, then in `.env` set `AI_ENABLED=true` and `ANTHROPIC_API_KEY` (from console.anthropic.com). Optional: `AI_MODEL` (default `claude-opus-5-5`), `AI_DAILY_LIMIT` (requests per day for the whole site, default 200). Without these the AI buttons don't show.
 Ticket text you send to the AI is processed by Anthropic.
 
-### Google Sheet (optional)
+### Google Sheet (optional): always in sync with Jira and Jira360
 
-Keep a task list in a Google Sheet and have its changes reach Jira, each one approved first.
-- **Columns**: the same as the bulk template (download it from the Bulk tab), plus **Comment**. The app adds **Task ID**, **Jira Key**, **Sync status** and **Last synced** if they are missing and fills them in; rows without a Task ID get one.
-- The sheet is checked every `SHEET_POLL_MINUTES` (default 5), or with **Check sheet now** in the Inbox. A new or edited row becomes a change in the **Inbox**, already checked against Jira. Nothing is sent until someone approves it; the row's Sync status says "Waiting for approval".
-- **Approve** sends it and writes the Jira key, "Synced" and the time into the row. **Reject** writes "Rejected" (with the reason); that version is not offered again unless the row changes again. Changing a row back before approval withdraws the change.
-- Only what changed in a row is sent. Emptying a cell empties that field in Jira. A **Comment** is added to the ticket once.
-- **Conflicts**: if a field was changed in Jira after the last sync and also in the sheet, the change shows both values; pick **Sheet** or **Jira**. Keeping Jira's value writes it into the sheet.
-- **Jira → sheet**: status, end date and assignee changes made in Jira are written into the row (needs the Jira webhook, see "Optional: Jira → portal"; `PORTAL_CALLBACK_URL` isn't needed for this).
+One ticket, one row. A change made in any of the three places reaches the other two:
+- **Jira360 → sheet**: every send from the form, bulk upload, portal or Inbox updates that ticket's row a moment later, and adds the row if it isn't there yet. Tickets Jira360 sent before the sheet was set up are added on the first sync.
+- **Sheet → Jira (and Jira360)**: edits in the sheet are sent to Jira on the next sync. Jira360 shows them too, because it reads Jira live.
+- **Jira → sheet**: changes made in Jira itself (by anyone) are written into the row on the next sync.
+
+**How it works.**
+- **When:** the server syncs every minute (Settings: "Sync every … minutes"; 0 = only by hand), or at once with **Sync sheet now** in the Inbox. A sync reads the sheet once, asks Jira which tickets changed since the last sync, and compares every field three ways: the row, Jira, and the value both last agreed on. Only what changed is sent, so a quiet sync makes no changes at all, and the app's own writes never bounce back.
+- **Sheet edits** (Settings → "Edits made in the sheet"):
+  - *Sync to Jira automatically* (default). Each edit is checked first. A row with a problem (a bad date, an unknown person) is not sent: its **Sync status** says why, and it also appears in the Inbox. Once you fix the cell, it is sent and the Inbox item goes away.
+  - *Wait for approval in the Inbox*. Every edit waits until someone approves or rejects it (as before).
+- **Changed in both places** between two syncs: **the newer change wins**, and the value that lost is kept in Activity. Jira's time comes from the ticket's history. For the sheet's time, add the optional **Edited at** column with the small script shown in Settings (Extensions → Apps Script); without it, a sheet edit counts as made halfway between two syncs.
+- **Columns**: the same as the bulk template (download it from the Bulk tab), plus **Comment** and any switched-on "More fields". The app adds **Task ID**, **Jira Key**, **Sync status** and **Last synced** if they are missing. New rows get a Task ID, and new rows with a title create a ticket.
+- **Values**:
+  - Emptying a cell empties that field in Jira.
+  - A **Comment** is added to the ticket once.
+  - Status words follow `STATUS_MAP` ("done" = Done).
+  - A person can be typed as an email or a name; the app writes names.
+- **Deleting** a row stops syncing that ticket; the ticket itself is left alone. A ticket deleted in Jira is marked "Ticket not found in Jira" in its row.
+- **Activity** lists every sync: "Google Sheet" for rows sent to Jira, "Jira" for rows updated from Jira, with before → after.
+- **Jira webhook** (optional, see "Optional: Jira → portal"): with it, a ticket's row is updated the moment it changes in Jira instead of within a minute.
+- **On Netlify** there is no timer: use **Sync sheet now**, or the Jira webhook.
 
 Setup:
-1. In Google Cloud, create a service account, enable the **Google Sheets API**, and create a JSON key for the account.
-2. Share the sheet with the service account's email (Editor).
-3. In `.env`: `GOOGLE_SA_JSON` = the key file's contents on one line (or `GOOGLE_SA_FILE` = its path), `SHEET_ID` = the id in the sheet's address (`docs.google.com/spreadsheets/d/<SHEET_ID>/edit`), and `SHEET_TAB` if the tab isn't called Sheet1.
+1. In Google Cloud, create a service account and a JSON key for it. Enable the **Google Sheets API**, and also the **Google Drive API** if you want the app to share sheets it creates.
+2. Paste the key in **Settings → Google Sheet** and save (or in `.env`: `GOOGLE_SA_JSON`, `SHEET_ID`, `SHEET_TAB`, `SHEET_POLL_MINUTES`, `SHEET_SYNC_MODE`=`auto`|`approve`).
+3. Make the sheet (Settings → **Make the sheet**), in one of three ways:
+   - **Create a new sheet**: type your Google email. The app creates the sheet, adds all the columns and dropdowns, shares it with you as Editor, links it in Settings and fills in the tickets Jira360 has sent. *Google often gives new service accounts no Drive storage of their own; creating then fails with a message saying so. Use the next way instead.*
+   - **Set up the linked sheet**: create a blank Google Sheet yourself and share it with the service account's email (shown in Settings) as Editor. Paste its address, save, and click **Set up the linked sheet**. Missing columns are added after yours (your own columns stay), with the same dropdowns and formats.
+   - **Download template (.xlsx)**: the same columns and dropdowns as a file. In Google Sheets use File → Import → Upload, then share and link it as above.
+
+The new sheet:
+- The header row is frozen.
+- Status, Priority, Assignee, Sprint, Fix version and Parent ticket have dropdowns from Jira's own lists. They only warn, so pasted values still go in, and the sync's own checks report problems.
+- Dates are formatted as dates.
+- The app's columns (Sync status, Last synced) are greyed out and warn before you edit them.
+- Edited at is hidden.
+
+**Sheet preview** (Settings, below the form, once a sheet is linked). It refreshes by itself every 15 seconds while Settings is open, and stops when you leave the tab. It shows:
+- **Columns**: each header, marked as synced with Jira, filled in by the app, or not recognised (not synced). It also lists the columns the sheet is missing, with a button to add them.
+- **What the next sync will do**: a dry run, refreshed every minute, that writes nothing. It lists each row and what will happen: to Jira, from Jira, new ticket, new row, conflict, problem, or waiting in the Inbox. Each line shows the field's old value → new value.
+- **Rows**: the first 100 rows as they are in the sheet. Rows with problems are tinted, and Jira keys link to the ticket.
+- **Sync now** applies the sync at once. **Open in Google Sheets** opens the sheet.
 
 ### Settings (admin)
 
@@ -181,7 +217,9 @@ Phases 2 and 3 below (Jira Automation webhook, full portal integration) reuse th
   "description": "Details of the task...",
   "status": "in_progress",
   "comment": "Template drafted, waiting on client review.",
-  "hoursSpent": 2,
+  "timeSpent": "2h 30m",
+  "adjustEstimate": "new",
+  "newEstimate": "1d",
   "assigneeEmail": "dev@company.com",
   "dueDate": "2026-10-20",
   "priority": "High"
@@ -189,6 +227,11 @@ Phases 2 and 3 below (Jira Automation webhook, full portal integration) reuse th
 ```
 
 Only `taskId` is required. `jiraKey` is optional: if the portal stores the key, updates go straight to it; otherwise the issue is found by the label `portal-<taskId>`.
+
+Work logs: `timeSpent` uses Jira's format (`2h 30m`). The older `hoursSpent` (a number of hours, e.g. `2`) still works.
+- `workDate` is when the work started (a date or an ISO date-time).
+- `worklogNote` is the description.
+- `adjustEstimate` is `auto` (default), `leave`, `new` (with `newEstimate`) or `manual` (with `reduceBy`).
 
 ---
 

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="description" content="Create and update Jira tickets, one at a time, from Excel, the portal or a Google Sheet, with a review before anything is sent.">
 <title>Jira360 · Tasks to Jira</title>
-<!-- Theme before first paint (no flash): the saved choice, else the system setting -->
+<!-- Theme before first paint (no flash): the saved choice, else the device setting -->
 <script>
   (function () {
     var pref = 'system';
@@ -14,332 +14,525 @@
     document.documentElement.dataset.theme = dark ? 'dark' : 'light';
   })();
 </script>
-<meta name="theme-color" content="#f6f7f9" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#0b0f17" media="(prefers-color-scheme: dark)">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232f5bea'/%3E%3Cpath d='M19 8v10.5a5 5 0 0 1-9.6 2' fill='none' stroke='white' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<meta name="theme-color" content="#14123a">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%237c6cff'/%3E%3Cstop offset='1' stop-color='%232f6bff'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='9' fill='url(%23g)'/%3E%3Cpath d='M19 8v10.5a5 5 0 0 1-9.6 2' fill='none' stroke='white' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
 <link rel="preload" href="fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="app.css">
 </head>
-<body class="min-h-dvh">
-<a href="#main" class="sr-only z-50 rounded-md bg-surface px-3 py-2 shadow-card focus:not-sr-only focus:fixed focus:top-3 focus:left-3">Skip to content</a>
+<body>
+<a href="#main" class="sr-only z-50 rounded-md bg-surface px-3 py-2 text-fg shadow-card focus:not-sr-only focus:fixed focus:top-3 focus:left-3">Skip to content</a>
 
-<!-- App header + navigation -->
-<header class="sticky top-0 z-30 border-b border-border bg-surface/90 backdrop-blur supports-[backdrop-filter]:bg-surface/80">
-  <div class="mx-auto flex max-w-[80rem] flex-wrap items-center gap-x-4 gap-y-3 px-4 py-3 sm:px-6">
-    <div class="flex min-w-0 items-center gap-3">
-      <svg class="size-8 shrink-0" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="var(--accent)"/><path d="M19 8v10.5a5 5 0 0 1-9.6 2" fill="none" stroke="var(--accent-fg)" stroke-width="3" stroke-linecap="round"/></svg>
-      <div class="min-w-0 leading-tight">
-        <p class="m-0 text-md font-semibold text-fg">Jira360</p>
-        <p id="optsState" class="m-0 truncate text-xs text-muted" role="status">Connecting to Jira…</p>
+<div class="shell">
+  <!-- Sidebar (a drawer on small screens) -->
+  <aside id="sidebar" class="sidebar" aria-label="Main menu">
+    <div class="brand">
+      <svg class="size-9 shrink-0" viewBox="0 0 32 32" aria-hidden="true">
+        <defs><linearGradient id="brandg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7c6cff"/><stop offset="1" stop-color="#2f6bff"/></linearGradient></defs>
+        <rect width="32" height="32" rx="9" fill="url(#brandg)"/><path d="M19 8v10.5a5 5 0 0 1-9.6 2" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+      </svg>
+      <div class="min-w-0">
+        <p class="brand-name">Jira360</p>
+        <p class="brand-sub">Tasks to Jira, reviewed</p>
       </div>
     </div>
 
-    <div class="ml-auto flex items-center gap-2 sm:order-last sm:ml-0">
-      <div class="inline-flex rounded-md border border-border bg-surface-2 p-0.5" role="group" aria-label="Colour theme">
-        <button type="button" class="themebtn" data-theme-choice="light" aria-pressed="false" aria-label="Light theme" title="Light">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
-        </button>
-        <button type="button" class="themebtn" data-theme-choice="dark" aria-pressed="false" aria-label="Dark theme" title="Dark">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
-        </button>
-        <button type="button" class="themebtn" data-theme-choice="system" aria-pressed="false" aria-label="Same as my device" title="Same as my device">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><rect width="20" height="14" x="2" y="3" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
-        </button>
-      </div>
-    </div>
-
-    <div class="flex w-full flex-wrap items-center gap-2 sm:ml-auto sm:w-auto sm:flex-nowrap">
-      <label for="who" class="sr-only">Your name</label>
-      <input id="who" autocomplete="name" placeholder="Your name (for the history)" class="min-w-0 flex-1 sm:w-52 sm:flex-none">
-      <label for="passcode" class="sr-only">Passcode</label>
-      <input id="passcode" type="password" autocomplete="current-password" placeholder="Team passcode" class="min-w-0 flex-1 sm:w-44 sm:flex-none">
-    </div>
-  </div>
-
-  <nav class="mx-auto max-w-[80rem] px-2 sm:px-4" aria-label="Sections">
-    <div class="tabs navtabs border-b-0" role="tablist">
-      <button type="button" role="tab" id="tabSingle" aria-controls="singlePanel" aria-selected="true">
+    <p class="navlabel" id="navLabel">Workspace</p>
+    <div class="navlist" role="tablist" aria-orientation="vertical" aria-labelledby="navLabel">
+      <button type="button" class="navitem" role="tab" id="tabSingle" aria-controls="singlePanel" aria-selected="true">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M12 18v-6M9 15h6"/></svg>
         Single ticket</button>
-      <button type="button" role="tab" id="tabBulk" aria-controls="bulkPanel" aria-selected="false">
+      <button type="button" class="navitem" role="tab" id="tabBulk" aria-controls="bulkPanel" aria-selected="false">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5M12 3v12"/></svg>
         Bulk upload</button>
-      <button type="button" role="tab" id="tabInbox" aria-controls="inboxPanel" aria-selected="false">
+      <button type="button" class="navitem" role="tab" id="tabInbox" aria-controls="inboxPanel" aria-selected="false">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
         Inbox<span id="ibadge" class="badge" hidden></span></button>
-      <button type="button" role="tab" id="tabActivity" aria-controls="activityPanel" aria-selected="false">
+      <button type="button" class="navitem" role="tab" id="tabActivity" aria-controls="activityPanel" aria-selected="false">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5M12 7v5l4 2"/></svg>
         Activity</button>
-      <button type="button" role="tab" id="tabSettings" aria-controls="settingsPanel" aria-selected="false">
+      <button type="button" class="navitem" role="tab" id="tabSettings" aria-controls="settingsPanel" aria-selected="false">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7h-9M14 17H5"/><circle cx="17" cy="17" r="3"/><circle cx="7" cy="7" r="3"/></svg>
         Settings</button>
     </div>
-  </nav>
-</header>
 
-<main id="main" class="app-main" tabindex="-1">
-
-  <!-- Single ticket -->
-  <section id="singlePanel" role="tabpanel" aria-labelledby="tabSingle">
-    <div class="pagehead">
-      <h1>Single ticket</h1>
-      <p>Create a ticket, or load one by its Task ID or Jira key to update it. Every change is reviewed before it's sent.</p>
-    </div>
-    <form id="f" class="card" autocomplete="off">
-      <div class="grid">
-        <div>
-          <label for="taskId">Task ID <span class="opt">(optional for a new ticket)</span></label>
-          <input id="taskId" name="taskId" placeholder="T-1001">
-        </div>
-        <div>
-          <label for="jiraKey">Jira key <span class="opt">(empty for a new ticket)</span></label>
-          <input id="jiraKey" name="jiraKey" placeholder="PCAIDEV-123">
-        </div>
-        <p id="sync" class="sync full" role="status"></p>
-        <details id="recent" class="full recent" hidden>
-          <summary id="recentSum"></summary>
-          <div id="recentBody"></div>
-        </details>
-
-        <h2 class="section full">Ticket details
-          <button class="linkbtn ai-only" id="aiDraftBtn" type="button">Draft from text with AI</button>
-          <button class="linkbtn" id="fcBtn" type="button">Customize fields</button></h2>
-        <div class="full">
-          <label for="title">Title</label>
-          <input id="title" name="title" maxlength="254" placeholder="Configure outage SMS template">
-        </div>
-        <div class="full">
-          <label for="description">Description <span class="opt">(replaces the Jira description when filled)</span>
-            <button class="linkbtn ai-only" id="aiRewriteBtn" type="button">Improve wording with AI</button></label>
-          <textarea id="description" name="description"></textarea>
-        </div>
-        <div>
-          <label for="assigneeId">Assignee</label>
-          <select id="assigneeId" name="assigneeId"><option value="">Unassigned</option></select>
-        </div>
-        <div>
-          <label for="parentKey">Parent ticket <span class="opt">(type to search epics)</span></label>
-          <input id="parentKey" name="parentKey" list="parentList" placeholder="Key or title">
-          <datalist id="parentList"></datalist>
-          <p id="parentInfo" class="fieldnote"></p>
-        </div>
-        <div>
-          <label for="startDate">Start date</label>
-          <input id="startDate" name="startDate" type="date">
-        </div>
-        <div>
-          <label for="dueDate">End date <span class="opt">(Jira due date)</span></label>
-          <input id="dueDate" name="dueDate" type="date">
-        </div>
-        <div>
-          <label for="originalEstimate">Original estimate <span class="opt">(4h, 1d 2h, 30m)</span></label>
-          <input id="originalEstimate" name="originalEstimate" placeholder="4h">
-        </div>
-        <div>
-          <label for="sprint">Sprint</label>
-          <select id="sprint" name="sprint"><option value="">No sprint (backlog)</option></select>
-        </div>
-        <div>
-          <label for="labelsInput">Labels <span class="opt">(pick or type, then Enter)</span></label>
-          <div class="chips" id="labelsBox"><input id="labelsInput" list="labelList" placeholder="Add label"></div>
-          <input type="hidden" id="labels" name="labels">
-          <datalist id="labelList"></datalist>
-          <p id="labelsNote" class="fieldnote"></p>
-        </div>
-        <div>
-          <label for="fixVersionsInput">Fix version</label>
-          <div class="chips" id="fixVersionsBox"><input id="fixVersionsInput" list="versionList" placeholder="Add version"></div>
-          <input type="hidden" id="fixVersions" name="fixVersions">
-          <datalist id="versionList"></datalist>
-          <p id="fixVersionsNote" class="fieldnote"></p>
-        </div>
-        <div>
-          <label for="priority">Priority</label>
-          <select id="priority" name="priority"><option value="">Default</option></select>
-        </div>
-        <div>
-          <label for="status">Status</label>
-          <select id="status" name="status"><option value="">Default (first step)</option></select>
-          <p id="statusInfo" class="fieldnote"></p>
-        </div>
-
-        <h2 class="section full" id="extraHead" hidden>More fields</h2>
-        <div id="extraFields" class="grid full"></div>
-
-        <h2 class="section full">Progress update <span class="opt">(optional, for existing tickets)</span></h2>
-        <div class="full">
-          <label for="comment">Update / comment</label>
-          <textarea id="comment" name="comment" placeholder="What changed today"></textarea>
-        </div>
-        <div>
-          <label for="hoursSpent">Hours spent <span class="opt">(logged as work)</span></label>
-          <input id="hoursSpent" name="hoursSpent" type="number" min="0" step="0.25" placeholder="0">
-        </div>
-      </div>
-
-      <div class="formfoot">
-        <button class="primary" id="go" type="submit">Review and send</button>
-        <button class="ghost" id="clear" type="button">Clear form</button>
-        <span class="keys"><kbd>Ctrl</kbd> + <kbd>Enter</kbd> review · <kbd>/</kbd> Task ID</span>
-      </div>
-      <div id="msg" class="msg" role="status"></div>
-    </form>
-  </section>
-
-  <!-- Bulk upload -->
-  <section id="bulkPanel" role="tabpanel" aria-labelledby="tabBulk" hidden>
-    <div class="pagehead">
-      <h1>Bulk upload</h1>
-      <p>Create or update many tickets from an Excel or CSV file. You review every row before anything is sent.</p>
-    </div>
-    <div class="card">
-      <p class="hint">One row per ticket; only <b>Title</b> is required. A row with a Jira key, or a Task ID sent before, updates that ticket.
-        Rows without a Task ID are matched by title, so uploading the same file again updates instead of duplicating.
-        <b>Assignee</b> can be an email or the person's name in Jira; labels are added to a ticket's existing labels.
-        <a href="#" id="tmpl">Download the template</a> to see all the columns.</p>
-      <label class="drop" id="drop">
-        <input id="file" type="file" accept=".xlsx,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
-        <svg class="mx-auto mb-3 size-8 text-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5M12 3v12"/></svg>
-        <span class="block font-semibold text-fg">Choose an Excel or CSV file</span>
-        <span class="mt-1 block text-sm text-muted">or drop it here · .xlsx or .csv · up to 200 rows</span>
-      </label>
-      <div id="bmsg" class="msg" role="status"></div>
-
-      <div id="bpreview" class="row" hidden>
-        <span id="bfile" class="mr-auto"></span>
-        <button class="primary" id="bopen" type="button">Open review</button>
-        <button class="ghost" id="breset" type="button">Choose another file</button>
-      </div>
-    </div>
-  </section>
-
-  <!-- Inbox -->
-  <section id="inboxPanel" role="tabpanel" aria-labelledby="tabInbox" hidden>
-    <div class="pagehead pagehead--actions">
+    <div class="sidefoot">
+      <p id="optsState" class="connection off m-0" role="status">Connecting to Jira…</p>
       <div>
-        <h1>Inbox</h1>
-        <p id="imode"></p>
+        <label for="who" class="sr-only">Your name</label>
+        <input id="who" autocomplete="name" placeholder="Your name (for the history)">
       </div>
-      <div class="flex flex-wrap gap-2">
-        <button class="ghost ai-only" id="isum" type="button">Summarize with AI</button>
-        <button class="ghost" id="irefresh" type="button">Refresh</button>
-      </div>
-    </div>
-    <div id="isheet" class="card mb-4 flex flex-wrap items-center gap-3 py-3 sm:py-3" hidden>
-      <span id="isheetInfo" class="mr-auto text-sm text-fg-2"></span>
-      <button class="ghost" id="isheetCheck" type="button">Check sheet now</button>
-    </div>
-    <div id="imsg" class="msg mb-4" role="status"></div>
-    <div id="ilist"></div>
-    <h2 class="mt-10 mb-3 text-lg font-semibold">Recently decided</h2>
-    <div id="idone" class="card p-0 sm:p-0 overflow-hidden"><p class="empty">Nothing decided yet.</p></div>
-  </section>
-
-  <!-- Settings -->
-  <section id="settingsPanel" role="tabpanel" aria-labelledby="tabSettings" hidden>
-    <div class="pagehead pagehead--actions">
       <div>
-        <h1>Settings</h1>
-        <p>Keys and switches for the whole site. Saved values apply straight away and win over .env.</p>
+        <label for="passcode" class="sr-only">Passcode</label>
+        <input id="passcode" type="password" autocomplete="current-password" placeholder="Team passcode">
       </div>
-      <button class="ghost" id="adminLock" type="button">Lock</button>
-    </div>
-    <div class="card">
-      <div id="slock">
-        <p class="hint">Enter the admin passcode (ADMIN_PASSCODE on the server) to view and change settings.</p>
-        <div class="row">
-          <label for="adminPass" class="sr-only">Admin passcode</label>
-          <input id="adminPass" type="password" autocomplete="off" placeholder="Admin passcode" class="sm:w-60">
-          <button class="primary" id="adminGo" type="button">Unlock</button>
-        </div>
-      </div>
-      <div id="smsg" class="msg" role="status"></div>
-
-      <div id="sform" hidden>
-        <p class="hint">Keys are never shown again after saving; type a new one to replace it. Each value says where it comes from.</p>
-
-        <h2 class="sset">Portal</h2>
-        <label class="check"><input type="checkbox" id="sApproval"> Portal changes wait in the Inbox until someone approves them <span id="sApprovalSrc"></span></label>
-
-        <h2 class="sset">AI suggestions (Claude)</h2>
-        <label class="check"><input type="checkbox" id="sAiOn"> AI suggestions on <span id="sAiOnSrc"></span></label>
-        <div class="grid mt-4">
-          <div class="full">
-            <label for="sAiKey">Anthropic API key <span id="sAiKeySrc"></span> <button class="linkbtn" id="sAiKeyDel" type="button" hidden>Remove saved key</button></label>
-            <input id="sAiKey" type="password" autocomplete="off" spellcheck="false">
-            <p class="fieldnote">From console.anthropic.com → API keys. The server needs the AI package: npm install @anthropic-ai/sdk</p>
-          </div>
-          <div>
-            <label for="sAiModel">Model</label>
-            <input id="sAiModel" list="sAiModels" spellcheck="false">
-            <datalist id="sAiModels"><option value="claude-opus-5-5">Most capable (default)</option><option value="claude-sonnet-5-5">Faster, lower cost</option><option value="claude-haiku-5-5">Fastest, lowest cost</option></datalist>
-          </div>
-          <div>
-            <label for="sAiLimit">Requests per day <span class="opt">(whole site)</span></label>
-            <input id="sAiLimit" type="number" min="0" step="1">
-          </div>
-        </div>
-        <div class="row tight mt-3"><button class="ghost" id="sAiTest" type="button">Test the key</button></div>
-        <div id="sAiTestOut" class="msg" role="status"></div>
-
-        <h2 class="sset">Google Sheet</h2>
-        <div class="grid">
-          <div class="full">
-            <label for="sSheetKey">Service account key <span id="sSheetKeySrc"></span> <button class="linkbtn" id="sSheetKeyDel" type="button" hidden>Remove saved key</button></label>
-            <textarea id="sSheetKey" spellcheck="false" autocomplete="off"></textarea>
-            <p class="fieldnote" id="sSheetShare"></p>
-          </div>
-          <div class="full">
-            <label for="sSheetId">Sheet address or id</label>
-            <input id="sSheetId" spellcheck="false" placeholder="https://docs.google.com/spreadsheets/d/…/edit">
-          </div>
-          <div>
-            <label for="sSheetTab">Tab</label>
-            <input id="sSheetTab" placeholder="Sheet1">
-          </div>
-          <div>
-            <label for="sSheetMin">Check every … minutes <span class="opt">(0 = only by hand)</span></label>
-            <input id="sSheetMin" type="number" min="0" max="1440" step="1">
-          </div>
-        </div>
-        <div class="row tight mt-3"><button class="ghost" id="sSheetTest" type="button">Test the sheet</button></div>
-        <div id="sSheetTestOut" class="msg" role="status"></div>
-
-        <div class="formfoot">
-          <button class="primary" id="sSave" type="button">Save settings</button>
-          <span id="supdated" class="muted"></span>
+      <div class="flex items-center justify-between gap-2">
+        <span class="text-xs text-nav-muted">Theme</span>
+        <div class="themegroup" role="group" aria-label="Colour theme">
+          <button type="button" class="themebtn" data-theme-choice="light" aria-pressed="false" aria-label="Light theme" title="Light">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+          </button>
+          <button type="button" class="themebtn" data-theme-choice="dark" aria-pressed="false" aria-label="Dark theme" title="Dark">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+          </button>
+          <button type="button" class="themebtn" data-theme-choice="system" aria-pressed="false" aria-label="Same as my device" title="Same as my device">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect width="20" height="14" x="2" y="3" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+          </button>
         </div>
       </div>
     </div>
-  </section>
+  </aside>
+  <button type="button" class="navscrim" id="navScrim" tabindex="-1" aria-label="Close menu"></button>
 
-  <!-- Activity -->
-  <section id="activityPanel" role="tabpanel" aria-labelledby="tabActivity" hidden>
-    <div class="pagehead">
-      <h1>Activity</h1>
-      <p>Everything sent to Jira from this page, bulk uploads, the portal and the Google Sheet. Click a row for that task's full history.</p>
+  <div class="content" id="content">
+    <!-- Small screens: top bar with the menu button -->
+    <div class="topbar">
+      <button type="button" class="iconbtn" id="navBtn" aria-controls="sidebar" aria-expanded="false" aria-label="Open menu">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+      <span class="text-md font-semibold">Jira360</span>
     </div>
-    <div class="card">
-      <div class="filters">
-        <div class="wide2"><label for="aq">Search</label><input id="aq" type="search" placeholder="Task ID, Jira key, title or name"></div>
-        <div><label for="asource">From</label>
-          <select id="asource"><option value="">Anywhere</option><option value="ui">Form</option><option value="bulk">Bulk upload</option><option value="portal">Portal</option><option value="sheet">Google Sheet</option></select></div>
-        <div><label for="aresult">Result</label>
-          <select id="aresult"><option value="">All</option><option value="ok">Sent</option><option value="failed">Failed</option></select></div>
-        <div><label for="afrom">From date</label><input id="afrom" type="date"></div>
-        <div><label for="ato">To date</label><input id="ato" type="date"></div>
+
+    <main id="main" class="app-main" tabindex="-1">
+      <!-- Overview: live numbers from the Inbox and the history (click to open them) -->
+      <div id="stats" class="stats" aria-label="Overview">
+        <button type="button" class="stat" id="statWaiting">
+          <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg></span>
+          <span><span class="num" id="nWaiting">–</span><span class="lbl">Waiting for approval</span></span>
+        </button>
+        <button type="button" class="stat ok" id="statSent">
+          <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span>
+          <span><span class="num" id="nSent">–</span><span class="lbl">Sent to Jira today</span></span>
+        </button>
+        <button type="button" class="stat err" id="statFailed">
+          <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg></span>
+          <span><span class="num" id="nFailed">–</span><span class="lbl">Failed or refused today</span></span>
+        </button>
       </div>
-      <div class="row">
-        <button class="ghost" id="arefresh" type="button">Refresh</button>
-        <button class="ghost" id="acsv" type="button">Export CSV</button>
-        <span id="acount" class="muted ml-auto"></span>
-      </div>
-      <div id="amsg" class="msg" role="status"></div>
-      <div class="scroll"><table id="atable"></table></div>
-      <div class="row justify-center"><button class="ghost" id="amore" type="button" hidden>Load more</button></div>
-    </div>
-  </section>
-</main>
+
+      <!-- Single ticket -->
+      <section id="singlePanel" role="tabpanel" aria-labelledby="tabSingle">
+        <div class="pagehead flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
+          <div>
+            <p class="eyebrow">Create or update</p>
+            <h1>Single ticket</h1>
+            <p>Load a ticket by its Task ID or Jira key to update it, or fill in a new one. Every change is reviewed before it's sent.</p>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <button class="ghost ai-only" id="aiDraftBtn" type="button">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/></svg>
+              Draft with AI</button>
+            <button class="ghost" id="fcBtn" type="button">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7h-9M14 17H5"/><circle cx="17" cy="17" r="3"/><circle cx="7" cy="7" r="3"/></svg>
+              Customize fields</button>
+          </div>
+        </div>
+
+        <div class="ticketgrid">
+          <form id="f" autocomplete="off">
+            <div class="panel">
+              <div class="panel-head">
+                <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></span>
+                <div><h2>Which ticket</h2><p>Empty for a new ticket; a Task ID is made for you.</p></div>
+              </div>
+              <div class="grid">
+                <div>
+                  <label for="taskId">Task ID <span class="opt">(optional)</span></label>
+                  <input id="taskId" name="taskId" placeholder="T-1001">
+                </div>
+                <div>
+                  <label for="jiraKey">Jira key <span class="opt">(to update)</span></label>
+                  <input id="jiraKey" name="jiraKey" placeholder="PCAIDEV-123">
+                </div>
+              </div>
+            </div>
+
+            <div class="panel">
+              <div class="panel-head">
+                <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg></span>
+                <div><h2>Details</h2><p>What the work is and who does it.</p></div>
+              </div>
+              <div class="grid">
+                <div class="full">
+                  <label for="title">Title</label>
+                  <input id="title" name="title" maxlength="254" placeholder="Configure outage SMS template">
+                </div>
+                <div class="full">
+                  <label for="description">Description <span class="opt">(replaces the Jira description when filled)</span>
+                    <button class="linkbtn ai-only" id="aiRewriteBtn" type="button">Improve wording with AI</button></label>
+                  <textarea id="description" name="description"></textarea>
+                </div>
+                <div>
+                  <label for="assigneeId">Assignee</label>
+                  <select id="assigneeId" name="assigneeId"><option value="">Unassigned</option></select>
+                </div>
+                <div>
+                  <label for="parentKey">Parent ticket <span class="opt">(type to search epics)</span></label>
+                  <input id="parentKey" name="parentKey" list="parentList" placeholder="Key or title">
+                  <datalist id="parentList"></datalist>
+                  <p id="parentInfo" class="fieldnote"></p>
+                </div>
+              </div>
+            </div>
+
+            <div class="panel">
+              <div class="panel-head">
+                <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></span>
+                <div><h2>Planning</h2><p>Dates, sprint, labels and priority.</p></div>
+              </div>
+              <div class="grid">
+                <div>
+                  <label for="startDate">Start date</label>
+                  <input id="startDate" name="startDate" type="date">
+                </div>
+                <div>
+                  <label for="dueDate">End date <span class="opt">(due date)</span></label>
+                  <input id="dueDate" name="dueDate" type="date">
+                </div>
+                <div>
+                  <label for="originalEstimate">Original estimate <span class="opt">(4h, 1d 2h)</span></label>
+                  <input id="originalEstimate" name="originalEstimate" placeholder="4h">
+                </div>
+                <div>
+                  <label for="sprint">Sprint</label>
+                  <select id="sprint" name="sprint"><option value="">No sprint (backlog)</option></select>
+                </div>
+                <div>
+                  <label for="labelsInput">Labels <span class="opt">(type, then Enter)</span></label>
+                  <div class="chips" id="labelsBox"><input id="labelsInput" list="labelList" placeholder="Add label"></div>
+                  <input type="hidden" id="labels" name="labels">
+                  <datalist id="labelList"></datalist>
+                  <p id="labelsNote" class="fieldnote"></p>
+                </div>
+                <div>
+                  <label for="fixVersionsInput">Fix version</label>
+                  <div class="chips" id="fixVersionsBox"><input id="fixVersionsInput" list="versionList" placeholder="Add version"></div>
+                  <input type="hidden" id="fixVersions" name="fixVersions">
+                  <datalist id="versionList"></datalist>
+                  <p id="fixVersionsNote" class="fieldnote"></p>
+                </div>
+                <div>
+                  <label for="priority">Priority</label>
+                  <select id="priority" name="priority"><option value="">Default</option></select>
+                </div>
+                <div>
+                  <label for="status">Status</label>
+                  <select id="status" name="status"><option value="">Default (first step)</option></select>
+                  <p id="statusInfo" class="fieldnote"></p>
+                </div>
+              </div>
+            </div>
+
+            <div class="panel" id="extraHead" hidden>
+              <div class="panel-head">
+                <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg></span>
+                <div><h2>More fields</h2><p>Other Jira fields switched on in "Customize fields".</p></div>
+              </div>
+              <div id="extraFields" class="grid"></div>
+            </div>
+
+            <div class="panel">
+              <div class="panel-head">
+                <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
+                <div><h2>Progress update</h2><p>Optional: a comment added to the ticket.</p></div>
+              </div>
+              <div class="grid">
+                <div class="full">
+                  <label for="comment">Update / comment</label>
+                  <textarea id="comment" name="comment" placeholder="What changed today"></textarea>
+                </div>
+              </div>
+            </div>
+
+            <!-- Like Jira's "Log work": time spent, when it started, the remaining estimate and a description -->
+            <div class="panel" id="logWork">
+              <div class="panel-head">
+                <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>
+                <div><h2>Log work</h2><p>Optional: adds a work log to the ticket, as Jira's "Log work" does.</p></div>
+              </div>
+              <div class="grid">
+                <div>
+                  <label for="timeSpent">Time spent <span class="opt">(2h 30m, 1d 4h, 45m)</span></label>
+                  <input id="timeSpent" name="timeSpent" placeholder="2h 30m" autocomplete="off" spellcheck="false">
+                </div>
+                <div>
+                  <label for="workDate">Date started <span class="opt">(empty = now)</span></label>
+                  <input id="workDate" type="datetime-local">
+                </div>
+                <fieldset class="full estimate">
+                  <legend>Remaining estimate</legend>
+                  <label class="check"><input type="radio" name="adjustEstimate" value="auto" checked> <span>Adjust automatically <span class="opt">(reduced by the time spent)</span></span></label>
+                  <label class="check"><input type="radio" name="adjustEstimate" value="leave"> Leave unchanged</label>
+                  <div class="estimate-row">
+                    <label class="check"><input type="radio" name="adjustEstimate" value="new"> Set to</label>
+                    <label for="newEstimate" class="sr-only">New remaining estimate</label>
+                    <input id="newEstimate" name="newEstimate" placeholder="2d" disabled spellcheck="false">
+                  </div>
+                  <div class="estimate-row">
+                    <label class="check"><input type="radio" name="adjustEstimate" value="manual"> Reduce by</label>
+                    <label for="reduceBy" class="sr-only">Reduce the remaining estimate by</label>
+                    <input id="reduceBy" name="reduceBy" placeholder="4h" disabled spellcheck="false">
+                  </div>
+                </fieldset>
+                <div class="full">
+                  <label for="worklogNote">Work description <span class="opt">(empty = the comment above)</span></label>
+                  <textarea id="worklogNote" name="worklogNote" placeholder="What you worked on"></textarea>
+                </div>
+              </div>
+            </div>
+          </form>
+
+          <!-- Summary and actions: sticky beside the form on large screens -->
+          <div class="aside">
+            <div class="panel">
+              <p class="eyebrow mb-2">This ticket</p>
+              <p id="sync" class="sync m-0" role="status"></p>
+              <p class="m-0 text-sm text-muted" id="syncEmpty">New ticket. Type a Task ID or Jira key to load an existing one.</p>
+              <div class="mt-5 flex flex-col gap-2.5">
+                <button class="primary btn-block" id="go" type="submit" form="f">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+                  Review and send</button>
+                <button class="ghost btn-block" id="clear" type="button">Clear form</button>
+              </div>
+              <p class="keys mt-4 mb-0 ml-0"><kbd>Ctrl</kbd> + <kbd>Enter</kbd> review · <kbd>/</kbd> Task ID</p>
+              <div id="msg" class="msg" role="status"></div>
+            </div>
+            <details id="recent" class="recent bg-surface shadow-card" hidden>
+              <summary id="recentSum"></summary>
+              <div id="recentBody"></div>
+            </details>
+          </div>
+        </div>
+      </section>
+
+      <!-- Bulk upload -->
+      <section id="bulkPanel" role="tabpanel" aria-labelledby="tabBulk" hidden>
+        <div class="pagehead">
+          <p class="eyebrow">Many at once</p>
+          <h1>Bulk upload</h1>
+          <p>Create or update many tickets from an Excel or CSV file. You review every row before anything is sent.</p>
+        </div>
+        <div class="panel">
+          <div class="panel-head">
+            <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h8"/></svg></span>
+            <div><h2>Upload a file</h2><p>Only <b>Title</b> is required; <a href="#" id="tmpl">download the template</a> to see all columns.</p></div>
+          </div>
+          <p class="hint">A row with a Jira key, or a Task ID sent before, updates that ticket. Rows without a Task ID are matched by title, so uploading the same file again updates instead of duplicating.
+            <b>Assignee</b> can be an email or the person's name in Jira; labels are added to a ticket's existing ones.</p>
+          <label class="drop" id="drop">
+            <input id="file" type="file" accept=".xlsx,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
+            <span class="mx-auto mb-3 grid size-12 place-items-center rounded-full bg-accent-soft text-accent-text">
+              <svg class="size-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5M12 3v12"/></svg>
+            </span>
+            <span class="block font-semibold text-fg">Choose an Excel or CSV file</span>
+            <span class="mt-1 block text-sm text-muted">or drop it here · .xlsx or .csv · up to 200 rows</span>
+          </label>
+          <div id="bmsg" class="msg" role="status"></div>
+          <div id="bpreview" class="row" hidden>
+            <span id="bfile" class="mr-auto"></span>
+            <button class="primary" id="bopen" type="button">Open review</button>
+            <button class="ghost" id="breset" type="button">Choose another file</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Inbox -->
+      <section id="inboxPanel" role="tabpanel" aria-labelledby="tabInbox" hidden>
+        <div class="pagehead flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
+          <div>
+            <p class="eyebrow">Approvals</p>
+            <h1>Inbox</h1>
+            <p id="imode"></p>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <button class="ghost ai-only" id="isum" type="button">Summarize with AI</button>
+            <button class="ghost" id="irefresh" type="button">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36L21 8"/><path d="M21 3v5h-5"/></svg>
+              Refresh</button>
+          </div>
+        </div>
+        <div id="isheet" class="panel mb-5 flex flex-wrap items-center gap-3 py-4 sm:py-4" hidden>
+          <span id="isheetInfo" class="mr-auto text-sm text-fg-2"></span>
+          <button class="ghost" id="isheetCheck" type="button">Sync sheet now</button>
+        </div>
+        <div id="imsg" class="msg mb-4" role="status"></div>
+        <div id="ilist"></div>
+        <h2 class="mt-10 mb-3 text-lg font-semibold">Recently decided</h2>
+        <div id="idone" class="card overflow-hidden p-0 sm:p-0"><p class="empty">Nothing decided yet.</p></div>
+      </section>
+
+      <!-- Settings -->
+      <section id="settingsPanel" role="tabpanel" aria-labelledby="tabSettings" hidden>
+        <div class="pagehead flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
+          <div>
+            <p class="eyebrow">Admin</p>
+            <h1>Settings</h1>
+            <p>Keys and switches for the whole site. Saved values apply straight away and win over .env.</p>
+          </div>
+          <button class="ghost" id="adminLock" type="button">Lock</button>
+        </div>
+        <div class="panel">
+          <div id="slock">
+            <p class="hint">Enter the admin passcode (ADMIN_PASSCODE on the server) to view and change settings.</p>
+            <div class="row">
+              <label for="adminPass" class="sr-only">Admin passcode</label>
+              <input id="adminPass" type="password" autocomplete="off" placeholder="Admin passcode" class="sm:w-60">
+              <button class="primary" id="adminGo" type="button">Unlock</button>
+            </div>
+          </div>
+          <div id="smsg" class="msg" role="status"></div>
+
+          <div id="sform" hidden>
+            <p class="hint">Keys are never shown again after saving; type a new one to replace it. Each value says where it comes from.</p>
+
+            <h2 class="sset">Portal</h2>
+            <label class="check"><input type="checkbox" id="sApproval"> Portal changes wait in the Inbox until someone approves them <span id="sApprovalSrc"></span></label>
+
+            <h2 class="sset">AI suggestions (Claude)</h2>
+            <label class="check"><input type="checkbox" id="sAiOn"> AI suggestions on <span id="sAiOnSrc"></span></label>
+            <div class="grid mt-4">
+              <div class="full">
+                <label for="sAiKey">Anthropic API key <span id="sAiKeySrc"></span> <button class="linkbtn" id="sAiKeyDel" type="button" hidden>Remove saved key</button></label>
+                <input id="sAiKey" type="password" autocomplete="off" spellcheck="false">
+                <p class="fieldnote">From console.anthropic.com → API keys. The server needs the AI package: npm install @anthropic-ai/sdk</p>
+              </div>
+              <div>
+                <label for="sAiModel">Model</label>
+                <input id="sAiModel" list="sAiModels" spellcheck="false">
+                <datalist id="sAiModels"><option value="claude-opus-5-5">Most capable (default)</option><option value="claude-sonnet-5-5">Faster, lower cost</option><option value="claude-haiku-5-5">Fastest, lowest cost</option></datalist>
+              </div>
+              <div>
+                <label for="sAiLimit">Requests per day <span class="opt">(whole site)</span></label>
+                <input id="sAiLimit" type="number" min="0" step="1">
+              </div>
+            </div>
+            <div class="row tight mt-3"><button class="ghost" id="sAiTest" type="button">Test the key</button></div>
+            <div id="sAiTestOut" class="msg" role="status"></div>
+
+            <h2 class="sset">Google Sheet</h2>
+            <div class="grid">
+              <div class="full">
+                <label for="sSheetKey">Service account key <span id="sSheetKeySrc"></span> <button class="linkbtn" id="sSheetKeyDel" type="button" hidden>Remove saved key</button></label>
+                <textarea id="sSheetKey" spellcheck="false" autocomplete="off"></textarea>
+                <p class="fieldnote" id="sSheetShare"></p>
+              </div>
+              <div class="full">
+                <label for="sSheetId">Sheet address or id</label>
+                <input id="sSheetId" spellcheck="false" placeholder="https://docs.google.com/spreadsheets/d/…/edit">
+              </div>
+              <div>
+                <label for="sSheetTab">Tab</label>
+                <input id="sSheetTab" placeholder="Sheet1">
+              </div>
+              <div>
+                <label for="sSheetMin">Sync every … minutes <span class="opt">(0 = only by hand)</span></label>
+                <input id="sSheetMin" type="number" min="0" max="1440" step="1">
+              </div>
+              <fieldset class="full estimate">
+                <legend>Edits made in the sheet <span id="sSyncSrc"></span></legend>
+                <label class="check"><input type="radio" name="sSyncMode" value="auto"> <span>Sync to Jira automatically <span class="opt">(checked first; rows with problems wait and say why)</span></span></label>
+                <label class="check"><input type="radio" name="sSyncMode" value="approve"> <span>Wait for approval in the Inbox</span></label>
+              </fieldset>
+              <details class="full recent">
+                <summary>Optional: exact "latest change wins" with an Edited at column</summary>
+                <p class="mt-2 text-sm text-fg-2">When the same cell changes in the sheet and in Jira between two syncs, the newer change is kept. Jira knows when its change was made; to give the sheet's edits an exact time too, add a column named <b>Edited at</b> (you can hide it), then in the sheet open <b>Extensions → Apps Script</b>, paste this and save:</p>
+                <pre class="mt-2 overflow-x-auto rounded-md border border-border bg-surface px-3 py-2 font-mono text-xs">function onEdit(e) {
+  var sh = e.range.getSheet(), head = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
+  var col = head.indexOf('Edited at') + 1;
+  if (!col || e.range.getRow() === 1 || (e.range.getColumn() &lt;= col &amp;&amp; e.range.getLastColumn() &gt;= col)) return;
+  sh.getRange(e.range.getRow(), col, e.range.getNumRows(), 1).setValue(Date.now());
+}</pre>
+                <p class="mt-2 mb-0 text-sm text-muted">Without it, a sheet edit counts as made halfway between two syncs.</p>
+              </details>
+            </div>
+            <div class="row tight mt-3"><button class="ghost" id="sSheetTest" type="button">Test the sheet</button></div>
+            <div id="sSheetTestOut" class="msg" role="status"></div>
+
+            <!-- Make the sheet: three ways -->
+            <div class="makesheet" id="sMake">
+              <h3 class="m-0 text-md font-semibold">Make the sheet</h3>
+              <p class="mt-1 mb-0 text-sm text-muted">With the service account key saved above, Jira360 can make a ready sheet: all the columns, dropdowns from Jira (status, priority, people, sprints), and your existing tickets filled in.</p>
+              <div class="row tight mt-4">
+                <label for="sShareWith" class="sr-only">Your Google email, to share the new sheet with</label>
+                <input id="sShareWith" type="email" autocomplete="email" placeholder="Your Google email (the sheet is shared with it)" class="sm:w-80">
+                <button class="primary" id="sCreate" type="button">Create a new sheet</button>
+              </div>
+              <div class="row tight mt-2.5">
+                <button class="ghost" id="sSetup" type="button">Set up the linked sheet</button>
+                <button class="ghost" id="sTemplate" type="button">Download template (.xlsx)</button>
+              </div>
+              <details class="recent mt-3">
+                <summary>Or make it yourself (if creating isn't allowed for the service account)</summary>
+                <ol class="mt-2 mb-1 list-decimal space-y-1 pl-5 text-sm text-fg-2">
+                  <li>In Google Sheets, create a blank sheet (or File → Import the template).</li>
+                  <li>Share it with <b id="sSaEmail">the service account</b> as <b>Editor</b>.</li>
+                  <li>Paste its link in "Sheet address" above and <b>Save settings</b>.</li>
+                  <li>Click <b>Set up the linked sheet</b>: the columns and dropdowns are added, your own columns stay.</li>
+                </ol>
+              </details>
+              <div id="sMakeOut" class="msg" role="status"></div>
+            </div>
+
+            <div class="formfoot">
+              <button class="primary" id="sSave" type="button">Save settings</button>
+              <span id="supdated" class="muted"></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Live preview of the linked sheet (refreshes by itself while this tab is open) -->
+        <div class="panel mt-5" id="spv" hidden>
+          <div class="panel-head">
+            <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/></svg></span>
+            <div class="min-w-0"><h2>Sheet preview</h2><p id="spvSub">Loading the sheet…</p></div>
+            <div class="actions">
+              <span id="spvLive" class="livepill" title="Refreshes every 15 seconds while this tab is open">Live</span>
+              <a id="spvOpen" class="ghost" href="#" target="_blank" rel="noopener">Open in Google Sheets</a>
+              <button class="primary" id="spvSync" type="button">Sync now</button>
+            </div>
+          </div>
+          <div id="spvMsg" class="msg" role="status"></div>
+          <h3 class="pvsec">Columns</h3>
+          <div id="spvCols" class="colchips"></div>
+          <p id="spvMissing" class="mt-2 mb-0 text-sm"></p>
+          <h3 class="pvsec">What the next sync will do</h3>
+          <div id="spvPlan" class="planlist"><p class="muted">Checking…</p></div>
+          <h3 class="pvsec">Rows <span id="spvCount" class="opt normal-case tracking-normal"></span></h3>
+          <div class="scroll"><table id="spvRows"></table></div>
+        </div>
+      </section>
+
+      <!-- Activity -->
+      <section id="activityPanel" role="tabpanel" aria-labelledby="tabActivity" hidden>
+        <div class="pagehead">
+          <p class="eyebrow">History</p>
+          <h1>Activity</h1>
+          <p>Everything sent to Jira from this page, bulk uploads, the portal and the Google Sheet. Click a row for that task's full history.</p>
+        </div>
+        <div class="panel">
+          <div class="filters">
+            <div class="wide2"><label for="aq">Search</label><input id="aq" type="search" placeholder="Task ID, Jira key, title or name"></div>
+            <div><label for="asource">From</label>
+              <select id="asource"><option value="">Anywhere</option><option value="ui">Form</option><option value="bulk">Bulk upload</option><option value="portal">Portal</option><option value="sheet">Google Sheet</option><option value="jira">Jira (sheet updated)</option></select></div>
+            <div><label for="aresult">Result</label>
+              <select id="aresult"><option value="">All</option><option value="ok">Sent</option><option value="failed">Failed</option></select></div>
+            <div><label for="afrom">From date</label><input id="afrom" type="date"></div>
+            <div><label for="ato">To date</label><input id="ato" type="date"></div>
+          </div>
+          <div class="row">
+            <button class="ghost" id="arefresh" type="button">Refresh</button>
+            <button class="ghost" id="acsv" type="button">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5M12 15V3"/></svg>
+              Export CSV</button>
+            <span id="acount" class="muted ml-auto"></span>
+          </div>
+          <div id="amsg" class="msg" role="status"></div>
+          <div class="scroll"><table id="atable"></table></div>
+          <div class="row justify-center"><button class="ghost" id="amore" type="button" hidden>Load more</button></div>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
 
 <!-- Dialogs -->
 <dialog id="pv" class="big" aria-labelledby="pvTitle">
@@ -411,6 +604,8 @@
 <script src="js/fields.js"></script>
 <script src="js/ai.js"></script>
 <script src="js/settings.js"></script>
+<script src="js/sheetpreview.js"></script>
+<script src="js/shell.js"></script>
 <script src="js/start.js"></script>
 </body>
 </html>

@@ -58,6 +58,8 @@ function renderSettings() {
   $('sSheetId').value = s.sheet.sheetId;
   $('sSheetTab').value = s.sheet.tab;
   $('sSheetMin').value = s.sheet.pollMinutes;
+  for (const r of document.querySelectorAll('input[name=sSyncMode]')) r.checked = r.value === s.sheet.syncMode;
+  $('sSyncSrc').innerHTML = src(s.sheet.source.syncMode);
   $('supdated').textContent = s.updatedBy || s.updatedAt ? `Last changed${s.updatedBy ? ' by ' + s.updatedBy : ''}${s.updatedAt ? ', ' + when(s.updatedAt) : ''}.` : '';
   for (const id of ['sAiTest', 'sSheetTest']) $(id + 'Out').className = 'msg';
 }
@@ -77,6 +79,8 @@ function settingsPatch() {
   if ($('sSheetId').value.trim() && $('sSheetId').value.trim() !== s.sheet.sheetId) sh.sheetId = $('sSheetId').value.trim();
   if ($('sSheetTab').value.trim() && $('sSheetTab').value.trim() !== s.sheet.tab) sh.tab = $('sSheetTab').value.trim();
   if ($('sSheetMin').value !== '' && Number($('sSheetMin').value) !== s.sheet.pollMinutes) sh.pollMinutes = Number($('sSheetMin').value);
+  const mode = document.querySelector('input[name=sSyncMode]:checked')?.value;
+  if (mode && mode !== s.sheet.syncMode) sh.syncMode = mode;
   if (Object.keys(sh).length) p.sheet = sh;
   return p;
 }

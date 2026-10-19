@@ -56,14 +56,15 @@ function renderInbox() {
   $('imode').innerHTML = (inbox.approvalMode
     ? '<b>Portal approval is on.</b> Changes from the portal wait here.'
     : '<b>Portal approval is off.</b> Portal changes are checked and sent straight away (set PORTAL_REQUIRE_APPROVAL=true to review them here).') +
-    (inbox.sheet?.configured ? ' Changes from the Google Sheet always wait here.' : '') + ' Nothing here reaches Jira until you approve it.';
+    (inbox.sheet?.configured ? (inbox.sheet.syncMode === 'approve' ? ' Edits made in the Google Sheet wait here too.' : ' Google Sheet edits sync automatically; only rows with problems show up here.') : '') +
+    ' Nothing here reaches Jira until you approve it.';
 
   const s = inbox.sheet || {};
   $('isheet').hidden = !s.configured;
   if (s.configured) {
     const p = s.lastPoll;
     $('isheetInfo').innerHTML = `${link(s.url, 'Google Sheet')} (tab ${esc(s.tab)}) · ` + (p
-      ? `last checked ${esc(when(p.at))}: ${p.queued} new, ${p.updated} updated, ${p.unchanged} unchanged` + (p.withdrawn ? `, ${p.withdrawn} withdrawn` : '')
+      ? `last synced ${esc(when(p.at))}: ${syncCounts(p)}`
       : 'not checked yet');
   }
 
@@ -113,15 +114,22 @@ $('ilist').addEventListener('click', async e => {
 });
 $('irefresh').addEventListener('click', loadInbox);
 
-// Google Sheet: look for new / changed rows now
+// What one sync did, in words
+function syncCounts(p) {
+  const parts = [[p.toJira, 'sent to Jira'], [p.toSheet, 'updated from Jira'], [p.created, 'ticket(s) created'], [p.added, 'row(s) added'],
+    [p.queued + (p.updated || 0), 'waiting for approval'], [p.conflicts, 'conflict(s) settled'], [p.problems, 'with problems']]
+    .filter(([n]) => n > 0).map(([n, t]) => `${n} ${t.replace('(s)', n === 1 ? '' : 's')}`);
+  return parts.join(', ') || 'everything already in step';
+}
+
+// Google Sheet: sync now
 $('isheetCheck').addEventListener('click', async () => {
   if (!needPass(ishow)) return;
   $('isheetCheck').disabled = true;
   ishow('info', 'Reading the Google Sheet…');
   try {
     const p = await api('ui/sheet/check', postJson({}));
-    ishow('ok', `Sheet checked: ${p.rows} rows · ${p.queued} new change${p.queued === 1 ? '' : 's'} · ${p.updated} updated · ${p.unchanged} unchanged` +
-      (p.withdrawn ? ` · ${p.withdrawn} withdrawn (changed back)` : '') + (p.skipped ? ` · ${p.skipped} skipped` : ''));
+    ishow('ok', `Sheet synced (${p.rows} rows): ${syncCounts(p)}.`);
     await loadInbox();
   } catch (err) {
     ishow('err', 'Sheet check failed: ' + esc(err.message));

@@ -10,7 +10,8 @@ import { syncAndRecord, listActivity, taskActivity } from '../lib/activity.js';
 import { checkTask, previewContext } from '../lib/check.js';
 import { readBulkFile, mapLimit, CHECK_CHUNK } from '../lib/bulk.js';
 import { listInbox, approve, reject } from '../lib/inbox.js';
-import { pollSheet, sheetStatus } from '../lib/sheet.js';
+import { pollSheet, sheetStatus, createSheet, setupSheet, sheetPreview } from '../lib/sheet.js';
+import { templateXlsx } from '../lib/sheet-layout.js';
 import { fieldsForPage, setFieldConfig } from '../lib/fields.js';
 import { log, logError, fail, sendError } from '../lib/log.js';
 import { aiStatus, testAi, draftTicket, rewriteTicket, similarTickets, suggestRowFixes, summarizeChanges } from '../lib/ai.js';
@@ -264,4 +265,29 @@ router.post('/ui/settings/test-sheet', uiAuth, adminAuth, async (_req, res) => {
   } catch (e) {
     fail(res, e.status === 503 ? 503 : 502, 'sheet_test_failed', e.message);
   }
+});
+
+// ---------- Making the Google Sheet, and the Settings preview (admin) ----------
+const sheetFail = (res, e) => {
+  if ([400, 409, 503].includes(e.status)) return fail(res, e.status, e.code || (e.status === 409 ? 'no_drive_storage' : e.status === 400 ? 'invalid' : 'not_configured'), e.message);
+  logError('sheet', e);
+  fail(res, 502, 'sheet_error', e.message);
+};
+router.post('/ui/sheet/create', uiAuth, adminAuth, async (req, res) => {
+  try { res.json(await createSheet({ title: req.body?.title, shareWith: String(req.body?.shareWith || '').trim(), by: userOf(req) })); }
+  catch (e) { sheetFail(res, e); }
+});
+router.post('/ui/sheet/setup', uiAuth, adminAuth, async (_req, res) => {
+  try { res.json(await setupSheet()); } catch (e) { sheetFail(res, e); }
+});
+router.get('/ui/sheet/preview', uiAuth, adminAuth, async (req, res) => {
+  try { res.json(await sheetPreview({ plan: req.query.plan === '1' })); } catch (e) { sheetFail(res, e); }
+});
+// The layout as an .xlsx, with Jira's dropdowns (File -> Import in Google Sheets)
+router.get('/ui/sheet/template.xlsx', uiAuth, async (_req, res) => {
+  try {
+    const buf = await templateXlsx();
+    res.set({ 'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'Content-Disposition': 'attachment; filename="jira360-sheet-template.xlsx"' });
+    res.send(buf);
+  } catch (e) { sendError(res, e, 'sheet'); }
 });

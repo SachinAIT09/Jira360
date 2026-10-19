@@ -33,7 +33,8 @@ async function loadFields() {
 }
 
 // The block (label + input) of a built-in field
-const blockOf = key => $(key)?.closest('.grid > div');
+// ("Log work" is a whole card)
+const blockOf = key => key === 'timeSpent' ? $('logWork') : $(key)?.closest('.grid > div');
 
 const MULTI = ['options', 'components', 'versions', 'users'];
 function extraInput(f) {
