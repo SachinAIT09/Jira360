@@ -48,7 +48,7 @@ try { localStorage.removeItem('jira.history'); localStorage.removeItem('jira.key
 function sent() { if (!$('activityPanel').hidden) loadActivity(); }
 
 // ---------- Tabs ----------
-const TABS = { single: ['tabSingle', 'singlePanel'], bulk: ['tabBulk', 'bulkPanel'], inbox: ['tabInbox', 'inboxPanel'], activity: ['tabActivity', 'activityPanel'] };
+const TABS = { single: ['tabSingle', 'singlePanel'], bulk: ['tabBulk', 'bulkPanel'], inbox: ['tabInbox', 'inboxPanel'], activity: ['tabActivity', 'activityPanel'], settings: ['tabSettings', 'settingsPanel'] };
 function showTab(name) {
   if (!TABS[name]) name = 'single';
   for (const [k, [tab, panel]] of Object.entries(TABS)) {
@@ -59,6 +59,7 @@ function showTab(name) {
   store.set('jira.tab', name);
   if (name === 'inbox') loadInbox();
   if (name === 'activity') loadActivity();
+  if (name === 'settings') loadSettings();
 }
 for (const name of Object.keys(TABS)) $(TABS[name][0]).addEventListener('click', () => showTab(name));
 

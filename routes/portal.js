@@ -5,7 +5,8 @@
 
 import crypto from 'node:crypto';
 import express from 'express';
-import { PORTAL_REQUIRE_APPROVAL, PORTAL_SHARED_SECRET } from '../lib/config.js';
+import { PORTAL_SHARED_SECRET } from '../lib/config.js';
+import { effective } from '../lib/settings.js';
 import { syncAndRecord, record } from '../lib/activity.js';
 import { checkTask, previewContext } from '../lib/check.js';
 import { addToInbox } from '../lib/inbox.js';
@@ -50,7 +51,7 @@ router.post('/portal/task', async (req, res) => {
       return fail(res, 400, 'invalid', 'The task has problems; nothing was sent to Jira', { errors: check.errors, warnings });
     }
 
-    if (PORTAL_REQUIRE_APPROVAL) {
+    if (effective().portal.requireApproval) { // Settings tab, or PORTAL_REQUIRE_APPROVAL
       const item = await addToInbox({ source: 'portal', task: input, check, eventId });
       const queued = { taskId: input.taskId, queued: true, inboxId: item.id, action: check.info.action, jiraKey: check.info.existingKey || undefined };
       await remember(eventId, queued);

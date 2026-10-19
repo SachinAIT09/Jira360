@@ -93,6 +93,18 @@ Setup:
 2. Share the sheet with the service account's email (Editor).
 3. In `.env`: `GOOGLE_SA_JSON` = the key file's contents on one line (or `GOOGLE_SA_FILE` = its path), `SHEET_ID` = the id in the sheet's address (`docs.google.com/spreadsheets/d/<SHEET_ID>/edit`), and `SHEET_TAB` if the tab isn't called Sheet1.
 
+### Settings (admin)
+
+The **Settings** tab sets the keys and switches without editing `.env` or restarting:
+- **Portal**: whether portal changes wait in the Inbox for approval.
+- **AI**: on/off, the Anthropic API key, the model, and the daily request limit. **Test the key** checks it with Anthropic without using a request.
+- **Google Sheet**: the service account key (paste the downloaded .json), the sheet's address, the tab, and how often to check it. The page shows which email to share the sheet with. **Test the sheet** reads it once.
+
+It needs the admin passcode: set `ADMIN_PASSCODE` in `.env` once (use a different, longer one than `UI_PASSCODE`). Without it the tab stays locked. After 10 wrong tries an address is locked out for 10 minutes.
+
+How values are used: a value saved in Settings wins over `.env`; **Remove saved key** goes back to the `.env` value. Each value is marked "set here", "from .env" or "default".
+Keys are kept on the server (in `data/` on your computer, in Netlify Blobs on Netlify, like `.env` they are stored as plain text, so keep that folder private) and are never sent back to the page, which shows only the last 4 characters. The admin passcode is remembered only until the browser tab is closed.
+
 ### Activity (history)
 
 The **Activity** tab lists everything sent to Jira from the form, bulk uploads, the portal and Inbox approvals. Everyone using the page sees the same history.

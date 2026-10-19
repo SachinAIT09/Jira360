@@ -13,7 +13,7 @@ import express from 'express';
 import { JIRA_WEBHOOK_SECRET, PORTAL_CALLBACK_URL, PORTAL_SHARED_SECRET } from '../lib/config.js';
 import { jira, whoAmI, adfToText } from '../lib/jira.js';
 import { log, logError } from '../lib/log.js';
-import { sheetConfigured, jiraChangedToSheet } from '../lib/sheet.js';
+import { isSheetConfigured, jiraChangedToSheet } from '../lib/sheet.js';
 
 const router = express.Router();
 export default router;
@@ -46,7 +46,7 @@ async function toPortal(payload) {
 }
 
 router.post('/jira/webhook', async (req, res) => {
-  if (!PORTAL_CALLBACK_URL && !sheetConfigured) return res.status(404).end();
+  if (!PORTAL_CALLBACK_URL && !isSheetConfigured()) return res.status(404).end();
   if (JIRA_WEBHOOK_SECRET && req.query.secret !== JIRA_WEBHOOK_SECRET) return res.status(401).end();
   const { webhookEvent, issue, user, changelog, comment } = req.body || {};
   try {

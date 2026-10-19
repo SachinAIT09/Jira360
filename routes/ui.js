@@ -2,7 +2,8 @@
 
 import crypto from 'node:crypto';
 import express from 'express';
-import { JIRA_ISSUE_TYPE, JIRA_PROJECT_KEY, PORTAL_REQUIRE_APPROVAL, UI_PASSCODE } from '../lib/config.js';
+import { JIRA_ISSUE_TYPE, JIRA_PROJECT_KEY, UI_PASSCODE } from '../lib/config.js';
+import { effective, settingsForPage, saveSettings, adminPasscode } from '../lib/settings.js';
 import { jira, lists, readIssue, browseUrl } from '../lib/jira.js';
 import { findIssue } from '../lib/sync.js';
 import { syncAndRecord, listActivity, taskActivity } from '../lib/activity.js';
@@ -12,7 +13,8 @@ import { listInbox, approve, reject } from '../lib/inbox.js';
 import { pollSheet, sheetStatus } from '../lib/sheet.js';
 import { fieldsForPage, setFieldConfig } from '../lib/fields.js';
 import { log, logError, fail, sendError } from '../lib/log.js';
-import { aiStatus, draftTicket, rewriteTicket, similarTickets, suggestRowFixes, summarizeChanges } from '../lib/ai.js';
+import { aiStatus, testAi, draftTicket, rewriteTicket, similarTickets, suggestRowFixes, summarizeChanges } from '../lib/ai.js';
+import { readSheet, sheetInfo } from '../lib/google.js';
 
 const router = express.Router();
 export default router;
@@ -107,7 +109,7 @@ const withUrl = item => item.result?.jiraKey ? { ...item, result: { ...item.resu
 router.get('/ui/inbox', uiAuth, async (_req, res) => {
   try {
     const { pending, decided } = await listInbox();
-    res.json({ approvalMode: PORTAL_REQUIRE_APPROVAL, pending, decided: decided.map(withUrl), sheet: await sheetStatus() });
+    res.json({ approvalMode: effective().portal.requireApproval, pending, decided: decided.map(withUrl), sheet: await sheetStatus() });
   } catch (e) {
     sendError(res, e, 'inbox');
   }
@@ -206,5 +208,53 @@ router.post('/ui/fields/config', uiAuth, async (req, res) => {
     res.json(saved);
   } catch (e) {
     sendError(res, e, 'fields');
+  }
+});
+
+// ---------- Settings (keys and switches): admin passcode only ----------
+// Wrong guesses are slowed down, and an address that keeps guessing is locked out for 10 minutes.
+const adminFails = new Map(); // ip -> { n, until }
+async function adminAuth(req, res, next) {
+  const admin = adminPasscode();
+  if (!admin) return fail(res, 503, 'not_configured', 'Settings are locked: set ADMIN_PASSCODE in .env (on the server) to use them');
+  const ip = req.ip || 'x', f = adminFails.get(ip);
+  if (f?.until > Date.now()) return fail(res, 429, 'locked', 'Too many wrong admin passcodes; try again in 10 minutes');
+  const given = req.get('X-Admin-Passcode') || '';
+  if (given.length !== admin.length || !crypto.timingSafeEqual(Buffer.from(given), Buffer.from(admin))) {
+    const n = (f?.n || 0) + 1;
+    adminFails.set(ip, { n, until: n >= 10 ? Date.now() + 600000 : 0 });
+    await new Promise(r => setTimeout(r, 600));
+    log('settings', { wrongAdminPasscode: ip, attempts: n });
+    return fail(res, 401, 'unauthorized', 'Wrong admin passcode');
+  }
+  adminFails.delete(ip);
+  next();
+}
+
+router.get('/ui/settings', uiAuth, adminAuth, (_req, res) => res.json(settingsForPage()));
+
+router.post('/ui/settings', uiAuth, adminAuth, async (req, res) => {
+  try {
+    const out = await saveSettings(req.body || {}, userOf(req));
+    log('settings', { savedBy: userOf(req), changed: Object.keys(req.body || {}) }); // never the values
+    res.json(out);
+  } catch (e) {
+    if (e.status === 400) return fail(res, 400, 'invalid', e.message);
+    sendError(res, e, 'settings');
+  }
+});
+
+// "Test" buttons: check what is saved, without changing anything
+router.post('/ui/settings/test-ai', uiAuth, adminAuth, async (_req, res) => {
+  try { res.json(await testAi()); }
+  catch (e) { fail(res, e.status || 502, 'ai_test_failed', e.message); }
+});
+router.post('/ui/settings/test-sheet', uiAuth, adminAuth, async (_req, res) => {
+  try {
+    const grid = await readSheet();
+    const header = grid.find(r => r.some(c => String(c).trim())) || [];
+    res.json({ ok: true, ...sheetInfo(), rows: Math.max(0, grid.length - 1), columns: header.filter(Boolean) });
+  } catch (e) {
+    fail(res, e.status === 503 ? 503 : 502, 'sheet_test_failed', e.message);
   }
 });

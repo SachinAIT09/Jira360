@@ -4,7 +4,8 @@
 import { fileURLToPath } from 'node:url';
 import express from 'express';
 import app, { missingEnv, whoAmI } from './app.js';
-import { pollSheet, sheetConfigured } from './lib/sheet.js';
+import { enableSheetTimer } from './lib/sheet.js';
+import { refreshSettings } from './lib/settings.js';
 
 const { PORT = 8080, HOST = '127.0.0.1' } = process.env; // HOST 0.0.0.0 lets others on the network open the form
 
@@ -22,9 +23,6 @@ app.listen(PORT, HOST, async () => {
   console.log(`portal-jira-sync listening on http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}/`);
 });
 
-// Google Sheet: look for new / changed rows every SHEET_POLL_MINUTES (0 = only with "Check sheet now")
-const minutes = Number(process.env.SHEET_POLL_MINUTES ?? 5);
-if (sheetConfigured && minutes > 0) {
-  setInterval(() => pollSheet().catch(e => console.error('sheet check failed:', e.message)), minutes * 60000);
-  console.log(`Google Sheet checked every ${minutes} min`);
-}
+// Settings saved in the page (keys, sheet), then the Google Sheet timer, which follows them
+await refreshSettings(true);
+enableSheetTimer();

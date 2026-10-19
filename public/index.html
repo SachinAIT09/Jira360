@@ -24,6 +24,7 @@
     <button type="button" role="tab" id="tabBulk" aria-controls="bulkPanel" aria-selected="false">Bulk upload (Excel / CSV)</button>
     <button type="button" role="tab" id="tabInbox" aria-controls="inboxPanel" aria-selected="false">Inbox<span id="ibadge" class="badge" hidden></span></button>
     <button type="button" role="tab" id="tabActivity" aria-controls="activityPanel" aria-selected="false">Activity</button>
+    <button type="button" role="tab" id="tabSettings" aria-controls="settingsPanel" aria-selected="false">Settings</button>
   </div>
 
   <section id="singlePanel" role="tabpanel" aria-labelledby="tabSingle">
@@ -168,6 +169,77 @@
     </div>
   </section>
 
+  <section id="settingsPanel" role="tabpanel" aria-labelledby="tabSettings" hidden>
+    <div class="card">
+      <div id="slock">
+        <p class="hint">Keys and switches for the whole site. Enter the admin passcode (set as ADMIN_PASSCODE on the server).</p>
+        <div class="row">
+          <label for="adminPass" style="margin:0">Admin passcode</label>
+          <input id="adminPass" type="password" autocomplete="off" style="max-width:240px">
+          <button class="primary" id="adminGo" type="button">Unlock</button>
+        </div>
+      </div>
+      <div id="smsg" class="msg" role="status"></div>
+
+      <div id="sform" hidden>
+        <div class="ihead"><p class="hint">Saved values apply straight away and win over .env. Keys are never shown again; type a new one to replace it.</p>
+          <button class="ghost" id="adminLock" type="button">Lock</button></div>
+
+        <h3 class="sset">Portal</h3>
+        <label class="check"><input type="checkbox" id="sApproval"> Portal changes wait in the Inbox until someone approves them <span id="sApprovalSrc"></span></label>
+
+        <h3 class="sset">AI suggestions (Claude)</h3>
+        <label class="check"><input type="checkbox" id="sAiOn"> AI suggestions on <span id="sAiOnSrc"></span></label>
+        <div class="grid" style="margin-top:12px">
+          <div class="full">
+            <label for="sAiKey">Anthropic API key <span id="sAiKeySrc"></span> <button class="linkbtn" id="sAiKeyDel" type="button" hidden>Remove saved key</button></label>
+            <input id="sAiKey" type="password" autocomplete="off" spellcheck="false">
+            <p class="fieldnote">From console.anthropic.com → API keys. Needs the AI package on the server: npm install @anthropic-ai/sdk</p>
+          </div>
+          <div>
+            <label for="sAiModel">Model</label>
+            <input id="sAiModel" list="sAiModels" spellcheck="false">
+            <datalist id="sAiModels"><option value="claude-opus-5-5">Most capable (default)</option><option value="claude-sonnet-5-5">Faster, lower cost</option><option value="claude-haiku-5-5">Fastest, lowest cost</option></datalist>
+          </div>
+          <div>
+            <label for="sAiLimit">Requests per day <span class="opt">(whole site; a cost guard)</span></label>
+            <input id="sAiLimit" type="number" min="0" step="1">
+          </div>
+        </div>
+        <div class="row tight" style="margin-top:10px"><button class="ghost" id="sAiTest" type="button">Test the key</button></div>
+        <div id="sAiTestOut" class="msg" role="status"></div>
+
+        <h3 class="sset">Google Sheet</h3>
+        <div class="grid">
+          <div class="full">
+            <label for="sSheetKey">Service account key <span id="sSheetKeySrc"></span> <button class="linkbtn" id="sSheetKeyDel" type="button" hidden>Remove saved key</button></label>
+            <textarea id="sSheetKey" spellcheck="false" autocomplete="off"></textarea>
+            <p class="fieldnote" id="sSheetShare"></p>
+          </div>
+          <div class="full">
+            <label for="sSheetId">Sheet address or id</label>
+            <input id="sSheetId" spellcheck="false" placeholder="https://docs.google.com/spreadsheets/d/…/edit">
+          </div>
+          <div>
+            <label for="sSheetTab">Tab</label>
+            <input id="sSheetTab" placeholder="Sheet1">
+          </div>
+          <div>
+            <label for="sSheetMin">Check every … minutes <span class="opt">(0 = only "Check sheet now")</span></label>
+            <input id="sSheetMin" type="number" min="0" max="1440" step="1">
+          </div>
+        </div>
+        <div class="row tight" style="margin-top:10px"><button class="ghost" id="sSheetTest" type="button">Test the sheet</button></div>
+        <div id="sSheetTestOut" class="msg" role="status"></div>
+
+        <div class="row">
+          <button class="primary" id="sSave" type="button">Save settings</button>
+          <span id="supdated" class="muted"></span>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <section id="activityPanel" role="tabpanel" aria-labelledby="tabActivity" hidden>
     <div class="card">
       <p class="hint">Everything sent to Jira from this page, bulk uploads and the portal, for everyone. Click a row to see that task's full history.</p>
@@ -260,6 +332,7 @@
 <script src="js/activity.js"></script>
 <script src="js/fields.js"></script>
 <script src="js/ai.js"></script>
+<script src="js/settings.js"></script>
 <script src="js/start.js"></script>
 </body>
 </html>

@@ -16,6 +16,7 @@
 
 import express from 'express';
 import { missingEnv } from './lib/config.js';
+import { refreshSettings } from './lib/settings.js';
 import uiRoutes from './routes/ui.js';
 import portalRoutes from './routes/portal.js';
 import jiraRoutes from './routes/jira.js';
@@ -33,5 +34,8 @@ app.use((req, res, next) => missingEnv.length && req.path !== '/health'
 app.use(express.json({ limit: '1mb', verify: (req, _res, buf) => { req.rawBody = buf; } }));
 
 app.get('/health', (_req, res) => res.json({ ok: !missingEnv.length }));
+
+// Settings saved in the page (re-read every 15 s, so all servers pick up a change)
+app.use((_req, _res, next) => refreshSettings().then(() => next(), () => next()));
 
 app.use(uiRoutes, portalRoutes, jiraRoutes);
