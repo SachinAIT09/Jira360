@@ -9,7 +9,10 @@ import { syncAndRecord, listActivity, taskActivity } from '../lib/activity.js';
 import { checkTask, previewContext } from '../lib/check.js';
 import { readBulkFile, mapLimit, CHECK_CHUNK } from '../lib/bulk.js';
 import { listInbox, approve, reject } from '../lib/inbox.js';
+import { pollSheet, sheetStatus } from '../lib/sheet.js';
+import { fieldsForPage, setFieldConfig } from '../lib/fields.js';
 import { log, logError, fail, sendError } from '../lib/log.js';
+import { aiStatus, draftTicket, rewriteTicket, similarTickets, suggestRowFixes, summarizeChanges } from '../lib/ai.js';
 
 const router = express.Router();
 export default router;
@@ -38,7 +41,7 @@ router.get('/ui/options', uiAuth, async (_req, res) => {
     get('users', lists.users(p), []), get('parents', lists.parents(p), []), get('statuses', lists.statuses(p), []),
     get('labels', lists.labels(), []),
   ]);
-  res.json({ project: p, issueType: JIRA_ISSUE_TYPE, sprints, versions, priorities, users, parents, statuses, labels, failed });
+  res.json({ project: p, issueType: JIRA_ISSUE_TYPE, sprints, versions, priorities, users, parents, statuses, labels, failed, ai: aiStatus() });
 });
 
 // Current Jira values for the form, keyed by the form's field names (polled by the page)
@@ -49,7 +52,7 @@ router.get('/ui/issue', uiAuth, async (req, res) => {
     const found = await findIssue({ jiraKey, taskId: taskId || '' });
     if (!found) return fail(res, 404, 'not_found', 'No ticket found', { notFound: true });
     const [issue, { transitions = [] }] = await Promise.all([
-      readIssue(found.key),
+      readIssue(found.key, { recent: true }),
       jira('GET', `/rest/api/3/issue/${encodeURIComponent(found.key)}/transitions`).catch(() => ({})),
     ]);
     res.json({ ...issue, nextStatuses: [...new Set(transitions.map(t => t.to?.name).filter(Boolean))] });
@@ -60,7 +63,7 @@ router.get('/ui/issue', uiAuth, async (req, res) => {
 
 // ---------- Preview before sending (single form and bulk upload) ----------
 router.post('/ui/preview', uiAuth, async (req, res) => {
-  res.json(await checkTask(req.body || {}, previewContext()));
+  res.json(await checkTask(req.body || {}, previewContext(), { withCurrent: true }));
 });
 
 // Bulk step 1: read the file and find duplicates inside it. No Jira calls, so it is quick.
@@ -81,7 +84,7 @@ router.post('/ui/bulk/check', uiAuth, async (req, res) => {
   if (!Array.isArray(rows) || !rows.length || rows.length > CHECK_CHUNK)
     return fail(res, 400, 'invalid', `Send 1 to ${CHECK_CHUNK} rows at a time`);
   const ctx = previewContext();
-  res.json({ rows: await mapLimit(rows, 5, async r => ({ row: r.row, ...(await checkTask(r.task || {}, ctx)) })) });
+  res.json({ rows: await mapLimit(rows, 5, async r => ({ row: r.row, ...(await checkTask(r.task || {}, ctx, { withCurrent: true })) })) });
 });
 
 // The page says which of its screens sent the task, for the logs
@@ -104,7 +107,7 @@ const withUrl = item => item.result?.jiraKey ? { ...item, result: { ...item.resu
 router.get('/ui/inbox', uiAuth, async (_req, res) => {
   try {
     const { pending, decided } = await listInbox();
-    res.json({ approvalMode: PORTAL_REQUIRE_APPROVAL, pending, decided: decided.map(withUrl) });
+    res.json({ approvalMode: PORTAL_REQUIRE_APPROVAL, pending, decided: decided.map(withUrl), sheet: await sheetStatus() });
   } catch (e) {
     sendError(res, e, 'inbox');
   }
@@ -115,7 +118,7 @@ const decidedBy = req => userOf(req) || String(req.body?.by || '').trim().slice(
 
 router.post('/ui/inbox/:id/approve', uiAuth, async (req, res) => {
   try {
-    const item = await approve(req.params.id, decidedBy(req));
+    const item = await approve(req.params.id, decidedBy(req), { keepJira: req.body?.keepJira });
     log('inbox', { approved: item.id, by: item.decidedBy, ...item.result });
     res.json(withUrl(item));
   } catch (e) {
@@ -155,5 +158,53 @@ router.get('/ui/activity/task', uiAuth, async (req, res) => {
     res.json({ items: await taskActivity({ taskId, jiraKey }) });
   } catch (e) {
     sendError(res, e, 'activity');
+  }
+});
+
+// ---------- AI suggestions (never sent to Jira from here: the page shows them, the person decides) ----------
+function aiRoute(path, fn) {
+  router.post(path, uiAuth, async (req, res) => {
+    try {
+      res.json(await fn(req.body || {}));
+    } catch (e) {
+      if ([400, 422, 429, 503].includes(e.status)) return fail(res, e.status, e.status === 400 ? 'invalid' : 'ai_unavailable', e.message);
+      sendError(res, e, 'ai');
+    }
+  });
+}
+aiRoute('/ui/ai/draft', b => draftTicket(b.text));
+aiRoute('/ui/ai/rewrite', b => rewriteTicket(b));
+aiRoute('/ui/ai/similar', b => similarTickets(b));
+aiRoute('/ui/ai/fix-rows', b => suggestRowFixes(b.rows));
+aiRoute('/ui/ai/summarize', async () => summarizeChanges((await listInbox()).pending));
+
+// ---------- Google Sheet: check it for new / changed rows now (they go to the Inbox) ----------
+router.post('/ui/sheet/check', uiAuth, async (_req, res) => {
+  try {
+    res.json(await pollSheet());
+  } catch (e) {
+    if (e.status === 400 || e.status === 503) return fail(res, e.status, e.status === 400 ? 'invalid' : 'not_configured', e.message);
+    logError('sheet', e);
+    fail(res, 502, 'sheet_error', e.message);
+  }
+});
+
+// ---------- Fields: every field Jira has for the project, and which ones the form shows ----------
+router.get('/ui/fields', uiAuth, async (_req, res) => {
+  try {
+    res.json(await fieldsForPage());
+  } catch (e) {
+    sendError(res, e, 'fields');
+  }
+});
+
+// The shared setting (everyone sees it); people can also show / hide fields just for themselves in the page
+router.post('/ui/fields/config', uiAuth, async (req, res) => {
+  try {
+    const saved = await setFieldConfig(req.body || {}, userOf(req));
+    log('fields', { config: saved });
+    res.json(saved);
+  } catch (e) {
+    sendError(res, e, 'fields');
   }
 });

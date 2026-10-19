@@ -40,7 +40,7 @@ router.post('/portal/task', async (req, res) => {
   if (prior) return res.json({ ...prior, duplicate: true });
 
   try {
-    const check = await checkTask(input, previewContext(input.projectKey || undefined));
+    const check = await checkTask(input, previewContext(input.projectKey || undefined), { withCurrent: true });
     const warnings = [...check.warnings, ...duplicateWarnings(check.info)];
     if (check.errors.length) {
       log('portal', { taskId: input.taskId, eventId, refused: check.errors });

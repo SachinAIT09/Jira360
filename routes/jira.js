@@ -1,4 +1,5 @@
-// Optional reverse sync: Jira changes on portal tickets are sent back to PORTAL_CALLBACK_URL.
+// Optional reverse sync: Jira changes on portal tickets are sent back to PORTAL_CALLBACK_URL, and
+// status / end date / assignee changes are written into the Google Sheet row (when the sheet is set up).
 // In Jira, add a webhook for "Issue updated" and "Comment created" pointing to
 //   https://<host>/jira/webhook?secret=<JIRA_WEBHOOK_SECRET>
 //
@@ -12,6 +13,7 @@ import express from 'express';
 import { JIRA_WEBHOOK_SECRET, PORTAL_CALLBACK_URL, PORTAL_SHARED_SECRET } from '../lib/config.js';
 import { jira, whoAmI, adfToText } from '../lib/jira.js';
 import { log, logError } from '../lib/log.js';
+import { sheetConfigured, jiraChangedToSheet } from '../lib/sheet.js';
 
 const router = express.Router();
 export default router;
@@ -44,7 +46,7 @@ async function toPortal(payload) {
 }
 
 router.post('/jira/webhook', async (req, res) => {
-  if (!PORTAL_CALLBACK_URL) return res.status(404).end();
+  if (!PORTAL_CALLBACK_URL && !sheetConfigured) return res.status(404).end();
   if (JIRA_WEBHOOK_SECRET && req.query.secret !== JIRA_WEBHOOK_SECRET) return res.status(401).end();
   const { webhookEvent, issue, user, changelog, comment } = req.body || {};
   try {
@@ -65,7 +67,8 @@ router.post('/jira/webhook', async (req, res) => {
     }
     const taskId = await portalTaskId(issue);
     if (!taskId) return; // not a ticket the portal created
-    await toPortal({ taskId, jiraKey: issue.key, ...payload });
+    if (PORTAL_CALLBACK_URL) await toPortal({ taskId, jiraKey: issue.key, ...payload });
+    if (payload.changes) await jiraChangedToSheet(taskId, payload.changes);
     log('jira-webhook', { taskId, jiraKey: issue.key, event: payload.event, ...(payload.changes && { changes: payload.changes }) });
   } catch (e) {
     logError('jira-webhook', e, { jiraKey: issue?.key });

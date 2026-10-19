@@ -19,22 +19,79 @@ Use A today. Move to B when volume grows or rules become hard to maintain. Both 
 
 ## Phase 1: HTML form (start here)
 
-A page where the team creates or updates Jira tickets, one at a time or many at once from an Excel/CSV file. Every send shows a preview first; nothing reaches Jira until it's confirmed. Each person's recent posts are listed under the form in their own browser.
+A page where the team creates or updates Jira tickets, one at a time or many at once from an Excel/CSV file or a Google Sheet. Every send shows a preview first; nothing reaches Jira until it's confirmed. Everything sent is listed in the Activity tab.
 
 Files:
 
 | File | What it is |
 |---|---|
-| `public/index.html` | The page (the only thing that is published) |
+| `public/` | The page: `index.html`, `styles.css`, and one script per tab in `js/` (the only folder that is published) |
 | `app.js` | The server: wires the routes together. Talks to Jira with the API token |
 | `lib/jira.js` | Jira client, lookups, and the cached lists the form shows |
 | `lib/sync.js` | Creates/updates tickets, moves status, adds comments and work logs (the only code that writes to Jira) |
 | `lib/check.js` | Checks a task against Jira before sending (the preview) |
 | `lib/bulk.js` | Reads Excel / CSV uploads |
 | `lib/store.js` | Remembers things across restarts (see "Storage" below) |
+| `lib/activity.js`, `lib/inbox.js` | The Activity history, and changes waiting for approval |
+| `lib/fields.js` | Jira's field list for the project, and which fields the form shows |
+| `lib/ai.js` | AI suggestions (optional) |
+| `lib/google.js`, `lib/sheet.js` | Google Sheet sync (optional) |
 | `routes/` | The web addresses: `ui.js` (the page), `portal.js` (the portal), `jira.js` (Jira webhook) |
 | `server.js` | Runs `app.js` on your computer (`npm start`) |
 | `netlify/functions/api.mjs`, `netlify.toml` | Runs `app.js` on Netlify |
+
+### Single ticket
+
+- Type a **Task ID** or **Jira key** to load a ticket; the form keeps it in sync with Jira every 10 seconds. A new ticket doesn't need a Task ID: one is made (`UI-…`) and shown after sending.
+- **Latest in Jira** (under the key) lists the ticket's last comments and logged work.
+- **Review and send** opens a dialog grouped into Details / Planning / Status and work / More fields. For an existing ticket each line shows what the ticket has now → what it will have; removed values are red.
+- Shortcuts: **Ctrl+Enter** reviews (and in the dialog, confirms), **Esc** goes back, **/** jumps to the Task ID.
+
+### Fields on the form
+
+**Customize fields** (above the title) lists every field Jira has for the project's issue type.
+- **More Jira fields**: custom fields such as story points, lists, checkboxes or people. Switch one on and it appears on the form under "More fields", in the bulk-upload template, and is read from Excel and Google Sheet columns with the same name. Use ↑ ↓ to order them.
+- **Already on the form**: the built-in fields can be switched off too (Title can't: a ticket needs one).
+- **Everyone** is saved on the server for all users. **Just for me** overrides it in your browser only.
+- Fields Jira requires for a new ticket are always shown. Fields that can't be edited from a form (attachments, links, ranking) are listed as such.
+
+### Bulk upload review
+
+After a file is read, a full-screen review opens (Close keeps it; **Open review** brings it back).
+- Tabs: **All / Problems / Warnings / New tickets / Updates**, and after sending **Sent / Failed**.
+- For a row that updates a ticket, each value shows the ticket's current value struck through → the file's value; labels show what is added.
+- **Edit** fixes a row in place; it is checked against Jira again on save.
+- **Tick all ready rows shown** / **Untick all shown** work on the current tab.
+- While sending, a progress bar and **Stop after this row**. Afterwards **Retry failed rows** and **Download results** (one line per row: created / updated / failed, with the Jira key).
+
+### AI suggestions (optional)
+
+With AI switched on, the page offers:
+- **Draft from text with AI**: paste an email, chat or notes; you get a title, a description with acceptance criteria, and suggested assignee, epic, priority, labels, estimate and sprint, each with a reason. Untick what you don't want, then **Fill the form**.
+- **Improve wording with AI**: a clearer title and description, shown before → after.
+- **Similar open tickets (AI)** in the review of a new ticket: finds tickets about the same work even when worded differently.
+- **Suggest fixes with AI** in the bulk review: corrections for rows with problems (e.g. "Hi" → High, a first name → the person, "finished" → Done). Click **Use** per fix or **Use all AI fixes**; the rows are checked again.
+- **Summarize with AI** in the Inbox: what is waiting, and which changes deserve a second look.
+
+The AI only suggests: it chooses only from Jira's real people, epics, sprints, priorities and statuses, and everything still goes through the normal review before anything is sent.
+
+Setup: `npm install @anthropic-ai/sdk`, then in `.env` set `AI_ENABLED=true` and `ANTHROPIC_API_KEY` (from console.anthropic.com). Optional: `AI_MODEL` (default `claude-opus-5-5`), `AI_DAILY_LIMIT` (requests per day for the whole site, default 200). Without these the AI buttons don't show.
+Ticket text you send to the AI is processed by Anthropic.
+
+### Google Sheet (optional)
+
+Keep a task list in a Google Sheet and have its changes reach Jira, each one approved first.
+- **Columns**: the same as the bulk template (download it from the Bulk tab), plus **Comment**. The app adds **Task ID**, **Jira Key**, **Sync status** and **Last synced** if they are missing and fills them in; rows without a Task ID get one.
+- The sheet is checked every `SHEET_POLL_MINUTES` (default 5), or with **Check sheet now** in the Inbox. A new or edited row becomes a change in the **Inbox**, already checked against Jira. Nothing is sent until someone approves it; the row's Sync status says "Waiting for approval".
+- **Approve** sends it and writes the Jira key, "Synced" and the time into the row. **Reject** writes "Rejected" (with the reason); that version is not offered again unless the row changes again. Changing a row back before approval withdraws the change.
+- Only what changed in a row is sent. Emptying a cell empties that field in Jira. A **Comment** is added to the ticket once.
+- **Conflicts**: if a field was changed in Jira after the last sync and also in the sheet, the change shows both values; pick **Sheet** or **Jira**. Keeping Jira's value writes it into the sheet.
+- **Jira → sheet**: status, end date and assignee changes made in Jira are written into the row (needs the Jira webhook, see "Optional: Jira → portal"; `PORTAL_CALLBACK_URL` isn't needed for this).
+
+Setup:
+1. In Google Cloud, create a service account, enable the **Google Sheets API**, and create a JSON key for the account.
+2. Share the sheet with the service account's email (Editor).
+3. In `.env`: `GOOGLE_SA_JSON` = the key file's contents on one line (or `GOOGLE_SA_FILE` = its path), `SHEET_ID` = the id in the sheet's address (`docs.google.com/spreadsheets/d/<SHEET_ID>/edit`), and `SHEET_TAB` if the tab isn't called Sheet1.
 
 ### Activity (history)
 

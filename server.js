@@ -2,7 +2,9 @@
 // On Netlify the same app runs from netlify/functions/api.mjs instead.
 
 import { fileURLToPath } from 'node:url';
+import express from 'express';
 import app, { missingEnv, whoAmI } from './app.js';
+import { pollSheet, sheetConfigured } from './lib/sheet.js';
 
 const { PORT = 8080, HOST = '127.0.0.1' } = process.env; // HOST 0.0.0.0 lets others on the network open the form
 
@@ -11,11 +13,18 @@ if (missingEnv.length) {
   process.exit(1);
 }
 
-// Serve only the page, never the folder, so .env and the code can't be downloaded.
-const PAGE = fileURLToPath(new URL('./public/index.html', import.meta.url));
-app.get(['/', '/index.html'], (_req, res) => res.sendFile(PAGE));
+// Serve only public/ (the page, its styles and scripts), never the project folder, so .env and
+// the server code can't be downloaded. Netlify publishes the same folder.
+app.use(express.static(fileURLToPath(new URL('./public/', import.meta.url)), { dotfiles: 'deny' }));
 
 app.listen(PORT, HOST, async () => {
   try { await whoAmI(); } catch (e) { console.error('Jira auth check failed:', e.message); }
   console.log(`portal-jira-sync listening on http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}/`);
 });
+
+// Google Sheet: look for new / changed rows every SHEET_POLL_MINUTES (0 = only with "Check sheet now")
+const minutes = Number(process.env.SHEET_POLL_MINUTES ?? 5);
+if (sheetConfigured && minutes > 0) {
+  setInterval(() => pollSheet().catch(e => console.error('sheet check failed:', e.message)), minutes * 60000);
+  console.log(`Google Sheet checked every ${minutes} min`);
+}

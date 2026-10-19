@@ -4,130 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Task to Jira</title>
-<style>
-  :root {
-    --bg: #f6f7f9; --card: #ffffff; --text: #1d2433; --muted: #6b7385; --line: #dfe3ea;
-    --accent: #0c66e4; --accent-text: #ffffff; --ok-bg: #e7f6ee; --ok: #1f7a4d; --err-bg: #fdecec; --err: #b42318;
-    --warn-bg: #fff4e0; --warn: #8a5300;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #14171d; --card: #1c2028; --text: #e6e9ef; --muted: #98a0b0; --line: #2e3440;
-      --accent: #579dff; --accent-text: #0b1220; --ok-bg: #13301f; --ok: #6fd39b; --err-bg: #3a1717; --err: #ff8a80;
-      --warn-bg: #3a2c12; --warn: #ffc56b;
-    }
-  }
-  * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-  main { max-width: 760px; margin: 0 auto; padding: 28px 16px 48px; }
-  main.wide { max-width: 1200px; }
-  h1 { font-size: 22px; margin: 0 0 4px; }
-  .sub { color: var(--muted); margin: 0 0 20px; }
-  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 20px; }
-  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 16px; }
-  .grid > * { min-width: 0; }
-  .full { grid-column: 1 / -1; }
-  label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 5px; }
-  .opt { font-weight: 400; color: var(--muted); }
-  input, select, textarea {
-    width: 100%; padding: 9px 10px; border: 1px solid var(--line); border-radius: 7px;
-    background: var(--bg); color: var(--text); font: inherit;
-  }
-  input[type=checkbox] { width: auto; }
-  textarea { min-height: 84px; resize: vertical; }
-  input:focus, select:focus, textarea:focus, button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: -1px; }
-  .row { display: flex; gap: 10px; align-items: center; margin-top: 18px; flex-wrap: wrap; }
-  button { border: 0; border-radius: 7px; padding: 10px 18px; font: inherit; font-weight: 600; cursor: pointer; }
-  .primary { background: var(--accent); color: var(--accent-text); }
-  .ghost { background: transparent; color: var(--muted); border: 1px solid var(--line); }
-  button:disabled { opacity: .6; cursor: not-allowed; }
-  .msg { margin-top: 16px; padding: 12px 14px; border-radius: 8px; display: none; }
-  .msg.ok { display: block; background: var(--ok-bg); color: var(--ok); }
-  .msg.err { display: block; background: var(--err-bg); color: var(--err); }
-  .msg.info { display: block; background: var(--bg); color: var(--muted); border: 1px solid var(--line); }
-  .msg a { color: inherit; font-weight: 600; }
-  h2 { font-size: 15px; margin: 28px 0 10px; }
-  table { width: 100%; border-collapse: collapse; font-size: 14px; }
-  th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
-  th { color: var(--muted); font-weight: 600; font-size: 12px; }
-  td a { color: var(--accent); }
-  .empty { color: var(--muted); font-size: 14px; }
-  .section { margin: 8px 0 -4px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
-  .section .opt { text-transform: none; letter-spacing: 0; font-weight: 400; }
-  .sync { margin: -4px 0 0; font-size: 13px; color: var(--muted); min-height: 1em; }
-  .sync b { color: var(--text); }
-  .sync a { color: var(--accent); }
-  .fieldnote { margin: 4px 0 0; font-size: 12px; color: var(--muted); min-height: 1em; overflow-wrap: anywhere; }
-  .fieldnote.warnt { color: var(--warn); }
-
-  /* Tag picker (labels, fix versions) */
-  .chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-height: 42px; padding: 5px 6px; border: 1px solid var(--line); border-radius: 7px; background: var(--bg); cursor: text; }
-  .chips:focus-within { outline: 2px solid var(--accent); outline-offset: -1px; }
-  .chips input { flex: 1; min-width: 120px; width: auto; border: 0; padding: 4px; background: transparent; }
-  .chips input:focus { outline: none; }
-  .chip { display: inline-flex; align-items: center; gap: 2px; max-width: 100%; padding: 2px 2px 2px 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--card); font-size: 13px; }
-  .chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .chip button { padding: 0 7px; background: transparent; color: var(--muted); border-radius: 999px; font-size: 15px; line-height: 1.3; }
-  .chip button:hover { color: var(--err); }
-
-  .bar { display: flex; align-items: center; gap: 10px; padding: 12px 16px; flex-wrap: wrap; }
-  .bar label { margin: 0; }
-  .bar input { max-width: 240px; }
-  .bar .opt { font-size: 13px; }
-  .tabs { display: flex; gap: 4px; margin: 18px 0 12px; border-bottom: 1px solid var(--line); overflow-x: auto; }
-  .tabs button { background: transparent; color: var(--muted); border-radius: 7px 7px 0 0; padding: 9px 14px; border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; }
-  .tabs button[aria-selected="true"] { color: var(--text); border-bottom-color: var(--accent); }
-
-  .hint { margin: 0; color: var(--muted); font-size: 14px; }
-  .hint a { color: var(--accent); font-weight: 600; }
-  .drop { position: relative; display: block; margin: 14px 0 0; padding: 26px 16px; border: 2px dashed var(--line); border-radius: 10px; text-align: center; cursor: pointer; font-weight: 400; font-size: 15px; }
-  .drop.over, .drop:focus-within { border-color: var(--accent); }
-  .drop input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
-  .bsummary { margin: 18px 0 0; }
-  .scroll { overflow-x: auto; margin-top: 10px; border: 1px solid var(--line); border-radius: 8px; }
-  #btable th, #btable td { white-space: nowrap; }
-  #btable td.wrap { white-space: normal; min-width: 220px; max-width: 340px; }
-  #btable tr.bad td { background: var(--err-bg); }
-  .muted { color: var(--muted); font-size: 12px; }
-  .good { color: var(--ok); }
-  .errt { color: var(--err); }
-  .warnt { color: var(--warn); }
-  .checks div + div { margin-top: 4px; }
-
-  dialog { width: min(580px, calc(100% - 32px)); max-height: calc(100% - 48px); padding: 22px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); color: var(--text); }
-  dialog::backdrop { background: rgb(0 0 0 / .45); }
-  dialog h3 { margin: 0 0 4px; font-size: 18px; }
-  dl.kv { display: grid; grid-template-columns: 150px 1fr; gap: 8px 14px; margin: 16px 0 0; }
-  dl.kv dt { color: var(--muted); font-size: 13px; }
-  dl.kv dd { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
-  dl.kv dd.remove { color: var(--err); }
-  .note { margin-top: 14px; padding: 10px 12px; border-radius: 8px; }
-  .note.err { background: var(--err-bg); color: var(--err); }
-  .note.warn { background: var(--warn-bg); color: var(--warn); }
-  .note ul { margin: 4px 0 0; padding-left: 18px; }
-  /* Inbox */
-  .badge { display: inline-block; min-width: 20px; margin-left: 6px; padding: 0 6px; border-radius: 999px; background: var(--accent); color: var(--accent-text); font-size: 12px; line-height: 20px; text-align: center; }
-  .ihead { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
-  .item { margin-top: 14px; padding: 16px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); }
-  .item .row { margin-top: 14px; }
-  .item .msg { margin-top: 12px; }
-  .item.gone { opacity: .55; }
-  /* Activity */
-  .filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px 12px; }
-  .filters .wide2 { grid-column: span 2; }
-  #atable tr.hit { cursor: pointer; }
-  #atable tr.hit:hover td { background: var(--bg); }
-  #atable tr.failed td { background: var(--err-bg); }
-  #atable td.wrap { min-width: 220px; max-width: 380px; }
-  #atable button { padding: 4px 10px; font-size: 13px; }
-  dialog.big { width: min(880px, calc(100% - 32px)); }
-  table.chg { margin-top: 10px; font-size: 13px; }
-  table.chg td { white-space: pre-wrap; overflow-wrap: anywhere; max-width: 320px; }
-  table.chg td div { max-height: 160px; overflow: auto; }
-  td.removed { color: var(--err); }
-  @media (max-width: 600px) { .filters .wide2 { grid-column: auto; } }
-  @media (max-width: 600px) { .grid { grid-template-columns: 1fr; } dl.kv { grid-template-columns: 1fr; gap: 2px; } dl.kv dd { margin-bottom: 8px; } }
-</style>
+<link rel="stylesheet" href="styles.css">
 </head>
 <body>
 <main>
@@ -153,7 +30,7 @@
     <form id="f" class="card" autocomplete="off">
       <div class="grid">
         <div>
-          <label for="taskId">Task ID <span class="opt">(needed for a new ticket)</span></label>
+          <label for="taskId">Task ID <span class="opt">(optional: one is made for a new ticket)</span></label>
           <input id="taskId" name="taskId" placeholder="T-1001">
         </div>
         <div>
@@ -161,14 +38,21 @@
           <input id="jiraKey" name="jiraKey" placeholder="PCAIDEV-123">
         </div>
         <p id="sync" class="sync full" role="status"></p>
+        <details id="recent" class="full recent" hidden>
+          <summary id="recentSum"></summary>
+          <div id="recentBody"></div>
+        </details>
 
-        <p class="section full">Ticket details</p>
+        <p class="section full">Ticket details
+          <button class="linkbtn ai-only" id="aiDraftBtn" type="button">Draft from text with AI</button>
+          <button class="linkbtn" id="fcBtn" type="button">Customize fields</button></p>
         <div class="full">
           <label for="title">Ticket title</label>
           <input id="title" name="title" maxlength="254" placeholder="Configure outage SMS template">
         </div>
         <div class="full">
-          <label for="description">Ticket description <span class="opt">(replaces the Jira description when filled)</span></label>
+          <label for="description">Ticket description <span class="opt">(replaces the Jira description when filled)</span>
+            <button class="linkbtn ai-only" id="aiRewriteBtn" type="button">Improve wording with AI</button></label>
           <textarea id="description" name="description"></textarea>
         </div>
         <div>
@@ -221,6 +105,9 @@
           <p id="statusInfo" class="fieldnote"></p>
         </div>
 
+        <p class="section full" id="extraHead" hidden>More fields</p>
+        <div id="extraFields" class="grid full"></div>
+
         <p class="section full">Progress update <span class="opt">(optional, for existing tickets)</span></p>
         <div class="full">
           <label for="comment">Update / comment</label>
@@ -235,6 +122,7 @@
       <div class="row">
         <button class="primary" id="go" type="submit">Review and send</button>
         <button class="ghost" id="clear" type="button">Clear form</button>
+        <span class="muted keys"><kbd>Ctrl</kbd>+<kbd>Enter</kbd> review · <kbd>/</kbd> Task ID</span>
       </div>
       <div id="msg" class="msg" role="status"></div>
     </form>
@@ -252,14 +140,10 @@
       </label>
       <div id="bmsg" class="msg" role="status"></div>
 
-      <div id="bpreview" hidden>
-        <p id="bsummary" class="bsummary"></p>
-        <div class="scroll"><table id="btable"></table></div>
-        <div class="row">
-          <button class="primary" id="bgo" type="button">Send to Jira</button>
-          <button class="ghost" id="bstop" type="button" hidden>Stop after this row</button>
-          <button class="ghost" id="breset" type="button">Choose another file</button>
-        </div>
+      <div id="bpreview" class="row" hidden>
+        <span id="bfile"></span>
+        <button class="primary" id="bopen" type="button">Open review</button>
+        <button class="ghost" id="breset" type="button">Choose another file</button>
       </div>
     </div>
   </section>
@@ -268,7 +152,14 @@
     <div class="card">
       <div class="ihead">
         <p id="imode" class="hint"></p>
-        <button class="ghost" id="irefresh" type="button">Refresh</button>
+        <span>
+          <button class="ghost ai-only" id="isum" type="button">Summarize with AI</button>
+          <button class="ghost" id="irefresh" type="button">Refresh</button>
+        </span>
+      </div>
+      <div id="isheet" class="row tight" hidden>
+        <span id="isheetInfo" class="muted"></span>
+        <button class="ghost" id="isheetCheck" type="button">Check sheet now</button>
       </div>
       <div id="imsg" class="msg" role="status"></div>
       <div id="ilist"></div>
@@ -283,7 +174,7 @@
       <div class="filters" style="margin-top:14px">
         <div class="wide2"><label for="aq">Search</label><input id="aq" type="search" placeholder="Task ID, Jira key, title or name"></div>
         <div><label for="asource">From</label>
-          <select id="asource"><option value="">Anywhere</option><option value="ui">Form</option><option value="bulk">Bulk upload</option><option value="portal">Portal</option></select></div>
+          <select id="asource"><option value="">Anywhere</option><option value="ui">Form</option><option value="bulk">Bulk upload</option><option value="portal">Portal</option><option value="sheet">Google Sheet</option></select></div>
         <div><label for="aresult">Result</label>
           <select id="aresult"><option value="">All</option><option value="ok">Sent</option><option value="failed">Failed</option></select></div>
         <div><label for="afrom">From date</label><input id="afrom" type="date"></div>
@@ -301,12 +192,59 @@
   </section>
 </main>
 
-<dialog id="pv" aria-labelledby="pvTitle">
+<dialog id="pv" class="big" aria-labelledby="pvTitle">
   <h3 id="pvTitle"></h3>
   <div id="pvBody"></div>
   <div class="row">
     <button class="primary" id="pvGo" type="button">Confirm and send</button>
     <button class="ghost" id="pvBack" type="button">Back to edit</button>
+    <span class="muted keys"><kbd>Ctrl</kbd>+<kbd>Enter</kbd> confirm · <kbd>Esc</kbd> back</span>
+  </div>
+</dialog>
+
+<dialog id="bm" class="full" aria-labelledby="bmTitle">
+  <div class="ihead">
+    <div><h3 id="bmTitle"></h3><p id="bsummary" class="bsummary"></p></div>
+    <button class="ghost" id="bmClose" type="button">Close</button>
+  </div>
+  <div class="tabs" id="btabs" role="tablist" aria-label="Show rows"></div>
+  <div class="row tight">
+    <button class="ghost" id="btick" type="button">Tick all ready rows shown</button>
+    <button class="ghost" id="buntick" type="button">Untick all shown</button>
+    <button class="ghost ai-only" id="baifix" type="button" hidden>Suggest fixes with AI</button>
+    <button class="ghost ai-only" id="baiall" type="button" hidden>Use all AI fixes</button>
+    <span id="bsel" class="muted"></span>
+  </div>
+  <progress id="bprog" hidden></progress>
+  <div id="bmmsg" class="msg" role="status"></div>
+  <div class="scroll bscroll"><table id="btable"></table></div>
+  <div class="row">
+    <button class="primary" id="bgo" type="button">Send to Jira</button>
+    <button class="ghost" id="bstop" type="button" hidden>Stop after this row</button>
+    <button class="ghost" id="bretry" type="button" hidden>Retry failed rows</button>
+    <button class="ghost" id="bresults" type="button" hidden>Download results</button>
+  </div>
+  <datalist id="bUsers"></datalist><datalist id="bSprints"></datalist><datalist id="bPriorities"></datalist><datalist id="bStatuses"></datalist>
+</dialog>
+
+<dialog id="ai" class="big" aria-labelledby="aiTitle">
+  <h3 id="aiTitle"></h3>
+  <div id="aiBody"></div>
+  <div id="aimsg" class="msg" role="status"></div>
+  <div class="row">
+    <button class="primary" id="aiGo" type="button"></button>
+    <button class="ghost" id="aiCancel" type="button">Cancel</button>
+    <span class="muted keys">Suggestions only: you review everything before it is sent</span>
+  </div>
+</dialog>
+
+<dialog id="fc" class="big" aria-labelledby="fcTitle">
+  <h3 id="fcTitle">Fields on the form</h3>
+  <div id="fcBody"></div>
+  <div id="fcmsg" class="msg" role="status"></div>
+  <div class="row">
+    <button class="primary" id="fcSave" type="button">Save for everyone</button>
+    <button class="ghost" id="fcClose" type="button">Close</button>
   </div>
 </dialog>
 
@@ -315,780 +253,13 @@
   <div id="tlBody"></div>
 </dialog>
 
-<script>
-const $ = id => document.getElementById(id);
-const store = {
-  get(k, d) { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } },
-  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
-};
-const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const link = (url, text) => `<a href="${esc(url)}" target="_blank" rel="noopener">${esc(text)}</a>`;
-const splitList = v => String(v || '').split(',').map(x => x.trim()).filter(Boolean);
-const sameText = (a, b) => String(a).toLowerCase() === String(b).toLowerCase();
-
-$('passcode').value = store.get('jira.passcode', '');
-let project = 'Jira';
-
-// All calls to the server: adds the passcode, turns error replies and network failures into readable errors
-async function api(path, opts = {}) {
-  let res;
-  try {
-    res = await fetch(path, { ...opts, headers: { ...(opts.headers || {}), 'X-UI-Passcode': $('passcode').value,
-      'X-User-Name': encodeURIComponent($('who').value.trim()) } });
-  } catch {
-    throw new Error("Can't reach the server. Check that it is running.");
-  }
-  // A reply that isn't JSON means the page is hosted somewhere without the Jira server behind it
-  const out = await res.json().catch(() => ({ error: res.status === 404 || res.status === 405
-    ? "This page can't find its Jira server. Open the form from the address where server.js runs (for example http://<that computer>:8080/)."
-    : `HTTP ${res.status}` }));
-  if (!res.ok) throw Object.assign(new Error(out.error || `HTTP ${res.status}`), { status: res.status, errors: out.errors });
-  return out;
-}
-const postJson = body => ({ method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-
-function needPass(show) {
-  if ($('passcode').value) return true;
-  show('err', 'Enter the passcode first.');
-  $('passcode').focus();
-  return false;
-}
-
-// ---------- Your name (goes with every send, for the history) ----------
-$('who').value = store.get('jira.name', '');
-$('who').addEventListener('change', () => store.set('jira.name', $('who').value.trim()));
-// The history now lives on the server (Activity tab); drop what older versions kept in this browser
-try { localStorage.removeItem('jira.history'); localStorage.removeItem('jira.keys'); } catch {}
-// After any send: the Activity tab, if open, shows it straight away
-function sent() { if (!$('activityPanel').hidden) loadActivity(); }
-
-// ---------- Tabs ----------
-const TABS = { single: ['tabSingle', 'singlePanel'], bulk: ['tabBulk', 'bulkPanel'], inbox: ['tabInbox', 'inboxPanel'], activity: ['tabActivity', 'activityPanel'] };
-function showTab(name) {
-  if (!TABS[name]) name = 'single';
-  for (const [k, [tab, panel]] of Object.entries(TABS)) {
-    $(panel).hidden = k !== name;
-    $(tab).setAttribute('aria-selected', String(k === name));
-  }
-  document.querySelector('main').classList.toggle('wide', name === 'bulk' || name === 'activity');
-  store.set('jira.tab', name);
-  if (name === 'inbox') loadInbox();
-  if (name === 'activity') loadActivity();
-}
-for (const name of Object.keys(TABS)) $(TABS[name][0]).addEventListener('click', () => showTab(name));
-
-// ---------- Lists from Jira (people, epics, sprints, versions, labels, priorities, statuses) ----------
-let opts = { users: [], parents: [], sprints: [], versions: [], labels: [], priorities: [], statuses: [] };
-
-// Fills a <select>, keeping its current value (adding it as an extra option if Jira's list lacks it)
-function fillSelect(sel, emptyText, items) {
-  const keep = sel.value;
-  sel.innerHTML = `<option value="">${esc(emptyText)}</option>` +
-    items.map(o => `<option value="${esc(o.value)}">${esc(o.text)}</option>`).join('');
-  ensureOption(sel, keep);
-}
-function ensureOption(sel, value, text) {
-  if (value && ![...sel.options].some(o => o.value === value)) sel.add(new Option(text || value, value));
-  sel.value = value || '';
-}
-const fillDatalist = (dl, items) => { dl.innerHTML = items.map(o => `<option value="${esc(o.value)}">${esc(o.text || '')}</option>`).join(''); };
-
-function applyOptions() {
-  fillSelect($('assigneeId'), 'Unassigned', opts.users.map(u => ({ value: u.id, text: u.email ? `${u.name} · ${u.email}` : u.name })));
-  fillSelect($('sprint'), 'No sprint (backlog)', opts.sprints.map(s => ({ value: s.name, text: `${s.name} (${s.state})` })));
-  fillSelect($('priority'), loaded ? 'No change' : 'Default', opts.priorities.map(p => ({ value: p, text: p })));
-  fillDatalist($('parentList'), opts.parents.map(p => ({ value: p.key, text: p.summary })));
-  if (!loaded) setStatusChoices(null);
-  pickers.labels.refresh();
-  pickers.fixVersions.refresh();
-  showParentInfo();
-}
-
-// Status: a new ticket can start in any workflow status; an existing one only where Jira allows it to move
-function setStatusChoices(current, next = []) {
-  const sel = $('status'), keep = sel.value;
-  if (current) {
-    sel.innerHTML = '';
-    for (const name of [current, ...next.filter(n => !sameText(n, current))])
-      sel.add(new Option(sameText(name, current) ? `${name} (current)` : name, name));
-    ensureOption(sel, keep || current);
-    $('statusInfo').textContent = next.length ? `${next.filter(n => !sameText(n, current)).length} moves allowed from ${current}` : '';
-  } else {
-    fillSelect(sel, 'Default (first step)', opts.statuses.map(s => ({ value: s, text: s })));
-    $('statusInfo').textContent = '';
-  }
-}
-
-function showParentInfo() {
-  const key = $('parentKey').value.trim().toUpperCase();
-  const p = opts.parents.find(x => x.key === key) || (loaded?.parent?.key === key ? loaded.parent : null);
-  $('parentInfo').textContent = !key ? '' : p ? p.summary : 'Not an open epic here; it will be checked when you review';
-}
-$('parentKey').addEventListener('input', showParentInfo);
-
-async function loadOptions() {
-  if (!$('passcode').value) return;
-  $('optsState').textContent = 'Loading lists from Jira…';
-  try {
-    const o = await api('ui/options');
-    project = o.project;
-    opts = o;
-    applyOptions();
-    $('optsState').textContent = o.failed?.length ? `Couldn't load from Jira: ${o.failed.join(', ')}` : `Lists loaded from ${o.project}`;
-  } catch (err) {
-    $('optsState').textContent = err.status === 401 ? 'Wrong passcode' : `Lists not loaded: ${err.message}`;
-  }
-}
-
-// ---------- Tag pickers (labels, fix versions) ----------
-// The chosen tags live in a hidden input as "a, b", so the rest of the form treats them as text.
-function makePicker(id, { listId, source, allowNew, noun }) {
-  const hidden = $(id), box = $(id + 'Box'), input = $(id + 'Input'), note = $(id + 'Note');
-  const values = () => splitList(hidden.value);
-  const set = list => { hidden.value = [...new Set(list)].join(', '); render(); };
-  function render() {
-    box.querySelectorAll('.chip').forEach(c => c.remove());
-    for (const v of values()) {
-      const chip = document.createElement('span');
-      chip.className = 'chip';
-      chip.innerHTML = `<span title="${esc(v)}">${esc(v)}</span><button type="button" aria-label="Remove ${esc(v)}">×</button>`;
-      chip.querySelector('button').addEventListener('click', () => { set(values().filter(x => x !== v)); input.focus(); });
-      box.insertBefore(chip, input);
-    }
-    refresh();
-  }
-  // Suggestions leave out what is already chosen
-  function refresh() {
-    const chosen = values().map(v => v.toLowerCase());
-    fillDatalist($(listId), source().filter(o => !chosen.includes(o.value.toLowerCase())));
-  }
-  function add(raw) {
-    note.textContent = ''; note.className = 'fieldnote';
-    const known = source().map(o => o.value);
-    for (let v of splitList(raw)) {
-      const match = known.find(k => sameText(k, v));
-      if (!match && !allowNew) { note.textContent = `"${v}" isn't a ${noun} in Jira`; note.className = 'fieldnote warnt'; continue; }
-      if (!match && /\s/.test(v)) { v = v.replace(/\s+/g, '-'); note.textContent = `Spaces aren't allowed in labels, so it became "${v}"`; }
-      if (!match && known.length) note.textContent ||= `"${v}" is a new label`;
-      v = match || v;
-      if (!values().some(x => sameText(x, v))) set([...values(), v]);
-    }
-    input.value = '';
-  }
-  input.addEventListener('keydown', e => {
-    if ((e.key === 'Enter' || e.key === ',') && input.value.trim()) { e.preventDefault(); add(input.value); }
-    else if (e.key === 'Enter') e.preventDefault(); // don't submit the form from here
-    else if (e.key === 'Backspace' && !input.value && values().length) set(values().slice(0, -1));
-  });
-  // Picking a suggestion from the list adds it straight away
-  input.addEventListener('input', e => {
-    if ((!e.inputType || e.inputType === 'insertReplacementText') && source().some(o => o.value === input.value)) add(input.value);
-  });
-  input.addEventListener('blur', () => { if (input.value.trim()) add(input.value); });
-  box.addEventListener('click', e => { if (e.target === box) input.focus(); });
-  return { render, refresh, set, clear: () => { set([]); note.textContent = ''; } };
-}
-const pickers = {
-  labels: makePicker('labels', { listId: 'labelList', allowNew: true, noun: 'label',
-    source: () => opts.labels.map(l => ({ value: l })) }),
-  fixVersions: makePicker('fixVersions', { listId: 'versionList', allowNew: false, noun: 'version',
-    source: () => [...opts.versions].sort((a, b) => a.released - b.released).map(v => ({ value: v.name, text: v.released ? 'released' : 'unreleased' })) }),
-};
-
-// ---------- Single ticket: live sync from Jira ----------
-// Fields filled from Jira. Every 10 s the page re-reads the ticket and refreshes any field
-// you haven't edited since the last read; your unsent edits are kept.
-const SYNCED = ['title', 'description', 'assigneeId', 'parentKey', 'startDate', 'dueDate',
-  'originalEstimate', 'sprint', 'labels', 'fixVersions', 'priority', 'status'];
-// Emptying one of these on an existing ticket removes the value in Jira
-const CLEARABLE = ['assigneeId', 'startDate', 'dueDate', 'sprint', 'labels', 'fixVersions'];
-const POLL_MS = 10000;
-let loaded = null;   // { jiraKey, values, parent } as last read from Jira
-let busy = false;
-
-function show(kind, html) { const m = $('msg'); m.className = 'msg ' + kind; m.innerHTML = html; }
-const setSync = html => { $('sync').innerHTML = html; };
-
-// Puts a value from Jira into a field, whatever kind of field it is
-function setField(k, v, out) {
-  const el = $(k);
-  if (k === 'assigneeId') ensureOption(el, v, out.assignee?.name);
-  else if (k === 'sprint') ensureOption(el, v, v && `${v} (${out.sprintState || 'closed'})`);
-  else if (el.tagName === 'SELECT') ensureOption(el, v);
-  else el.value = v ?? '';
-  if (pickers[k]) pickers[k].render();
-}
-
-function forgetTicket() {
-  const hadTicket = !!loaded;
-  loaded = null;
-  $('priority').options[0].text = 'Default';
-  setStatusChoices(null);
-  if (hadTicket) $('status').value = ''; // the old ticket's status means nothing for a new one
-}
-
-async function pullFromJira() {
-  const jiraKey = $('jiraKey').value.trim(), taskId = $('taskId').value.trim();
-  if (!$('passcode').value || (!jiraKey && !taskId)) { forgetTicket(); setSync(''); return; }
-  if (busy) return;
-  busy = true;
-  // The key or task ID may change while a request is out; such answers are ignored
-  const stale = () => jiraKey !== $('jiraKey').value.trim() || taskId !== $('taskId').value.trim();
-  try {
-    const q = new URLSearchParams();
-    if (jiraKey) q.set('jiraKey', jiraKey);
-    if (taskId) q.set('taskId', taskId);
-    let out;
-    try { out = await api('ui/issue?' + q); }
-    catch (e) {
-      if (stale()) return;
-      if (e.status === 404 && !jiraKey) { forgetTicket(); setSync('New ticket: it will be created when you send.'); return; }
-      throw e.status === 404 ? new Error(`${jiraKey} not found in Jira`) : e;
-    }
-    if (stale()) return;
-
-    const same = loaded && loaded.jiraKey === out.jiraKey;
-    // Status choices depend on the ticket's current status; keep a status you picked but haven't sent
-    const statusEdited = same && $('status').value !== loaded.values.status;
-    setStatusChoices(out.statusName, out.nextStatuses);
-    if (!statusEdited) $('status').value = out.statusName;
-    $('priority').options[0].text = 'No change';
-
-    const snapshot = {};
-    let kept = 0;
-    for (const k of SYNCED) {
-      if (same && $(k).value !== loaded.values[k]) { kept++; snapshot[k] = loaded.values[k]; continue; } // edited here
-      setField(k, out.values[k], out);
-      snapshot[k] = $(k).value; // what the field really holds
-    }
-    loaded = { jiraKey: out.jiraKey, values: snapshot, parent: out.parent };
-    $('jiraKey').value = out.jiraKey;
-    showParentInfo();
-
-    setSync(`Synced with ${link(out.url, out.jiraKey)} · Status: <b>${esc(out.statusName)}</b>` +
-      ` · checked ${new Date().toLocaleTimeString()}` + (kept ? ` · keeping ${kept} field${kept > 1 ? 's' : ''} you edited` : ''));
-  } catch (err) {
-    setSync('Jira sync failed: ' + esc(err.message));
-  } finally {
-    busy = false;
-  }
-}
-
-setInterval(() => { if (loaded && document.visibilityState === 'visible') pullFromJira(); }, POLL_MS);
-document.addEventListener('visibilitychange', () => { if (loaded && document.visibilityState === 'visible') pullFromJira(); });
-
-// The server remembers which ticket each Task ID belongs to, so the Task ID alone loads it
-$('taskId').addEventListener('change', pullFromJira);
-$('jiraKey').addEventListener('change', pullFromJira);
-
-$('clear').addEventListener('click', () => {
-  $('f').reset(); $('msg').className = 'msg';
-  pickers.labels.clear(); pickers.fixVersions.clear();
-  forgetTicket(); setSync(''); showParentInfo();
-});
-
-// ---------- Single ticket: preview, then send ----------
-const LABELS = {
-  title: 'Title', description: 'Description', assigneeId: 'Assignee', assigneeEmail: 'Assignee', parentKey: 'Parent ticket',
-  startDate: 'Start date', dueDate: 'End date', originalEstimate: 'Original estimate', sprint: 'Sprint',
-  labels: 'Labels', fixVersions: 'Fix version', priority: 'Priority', status: 'Status',
-  comment: 'Comment', hoursSpent: 'Log work',
-};
-function shownValue(k, v, info) {
-  if ((k === 'assigneeId' || k === 'assigneeEmail') && info.assigneeName) return info.assigneeName;
-  if (k === 'parentKey' && info.parentSummary) return `${v}: ${info.parentSummary}`;
-  if (k === 'status') return info.statusName || v;
-  if (k === 'hoursSpent') return `${v} hours`;
-  return v;
-}
-const noteList = (kind, title, items) => items.length
-  ? `<div class="note ${kind}"><b>${title}</b><ul>${items.map(x => `<li>${esc(x)}</li>`).join('')}</ul></div>` : '';
-
-function setBusy(on, text) { $('go').disabled = on; $('go').textContent = on ? text : 'Review and send'; }
-
-let pending = null;     // checked task waiting for "Confirm and send"
-let pendingFrom = '';   // 'activity' when the preview was opened by Retry there
-
-$('f').addEventListener('submit', async e => {
-  e.preventDefault();
-  if (!needPass(show)) return;
-  // A tag typed but not yet confirmed with Enter still counts
-  for (const k of Object.keys(pickers)) if ($(k + 'Input').value.trim()) $(k + 'Input').dispatchEvent(new Event('blur'));
-  const data = {};
-  for (const [k, v] of new FormData($('f'))) { const t = String(v).trim(); if (t) data[k] = t; }
-  if (data.hoursSpent) data.hoursSpent = Number(data.hoursSpent);
-  // An existing ticket can be updated by its Jira key alone; a new one needs a Task ID to be found again later
-  if (!data.taskId) {
-    if (!data.jiraKey) { show('err', 'Enter a Task ID for a new ticket, or a Jira key to update one.'); $('taskId').focus(); return; }
-    data.taskId = data.jiraKey.toUpperCase();
-  }
-  // For a ticket loaded from Jira, send only what was changed here, so untouched fields
-  // (like a richly formatted description) aren't rewritten. Emptied fields are removed in Jira.
-  if (loaded && sameText(loaded.jiraKey, data.jiraKey || '')) {
-    const clear = [];
-    for (const k of SYNCED) {
-      const now = (data[k] || ''), before = (loaded.values[k] || '').trim();
-      if (now === before) delete data[k];
-      else if (!now && CLEARABLE.includes(k)) clear.push(k);
-    }
-    if (clear.length) data.clear = clear;
-    data.replaceLists = true; // labels / fix versions shown here are the full list
-  }
-
-  setBusy(true, 'Checking…');
-  try {
-    pending = await api('ui/preview', postJson(data));
-    pendingFrom = '';
-    openPreview(pending);
-  } catch (err) {
-    show('err', 'Failed: ' + esc(err.message));
-  } finally {
-    setBusy(false);
-  }
-});
-
-function openPreview({ task, errors, warnings, info }) {
-  const update = info.action === 'update';
-  const fields = Object.keys(LABELS).filter(k => task[k] !== undefined && task[k] !== '' && !(k === 'assigneeEmail' && task.assigneeId));
-  const cleared = (task.clear || []).filter(k => LABELS[k]);
-  $('pvTitle').textContent = update ? `Update ${info.existingKey}` : `Create a new ticket in ${project}`;
-  $('pvBody').innerHTML =
-    `<p class="muted">Task ID ${esc(task.taskId)}${update ? ` · ${link(info.url, 'open in Jira')} · only the fields below change` : ''}</p>` +
-    (fields.length || cleared.length
-      ? `<dl class="kv">${fields.map(k => `<dt>${LABELS[k]}</dt><dd>${esc(shownValue(k, task[k], info))}</dd>`).join('')}` +
-        `${cleared.map(k => `<dt>${LABELS[k]}</dt><dd class="remove">Remove from the ticket</dd>`).join('')}</dl>`
-      : `<p>Nothing has changed, so there is nothing to send.</p>`) +
-    noteList('err', 'Fix these before sending:', errors) +
-    (info.duplicates?.length ? `<div class="note warn"><b>Possible duplicate.</b> ${duplicateNotes(info)[0]}. Confirm only if you really want another ticket.</div>` : '') +
-    noteList('warn', 'Please note:', warnings);
-  $('pvGo').disabled = !!errors.length || !(fields.length || cleared.length);
-  $('pvGo').textContent = update ? 'Confirm and update' : 'Confirm and create';
-  $('pv').showModal();
-  (errors.length || !(fields.length || cleared.length) ? $('pvBack') : $('pvGo')).focus();
-}
-$('pvBack').addEventListener('click', () => $('pv').close());
-
-$('pvGo').addEventListener('click', async () => {
-  $('pv').close();
-  const task = pending.task;
-  if (pendingFrom === 'activity') return retrySend(task);
-  setBusy(true, 'Sending…');
-  try {
-    const out = await api('ui/task', postJson(task));
-    sent();
-    $('jiraKey').value = out.jiraKey;
-    $('comment').value = ''; $('hoursSpent').value = '';
-    loaded = null; pullFromJira(); // reload everything from Jira, including what was just sent
-    show('ok', `Done: ${link(out.url, out.jiraKey)} (${esc(out.actions.join(', ') || 'no changes')})` +
-      (out.warning ? `<br>Note: ${esc(out.warning)}` : ''));
-  } catch (err) {
-    show('err', 'Failed: ' + esc(err.message));
-  } finally {
-    setBusy(false);
-  }
-});
-
-// ---------- Bulk upload: read file, preview rows, send the ticked ones ----------
-let bulk = null;       // { fileName, rows: [{ row, task, errors, warnings, info, selected, done, sending, result }], ignoredColumns }
-let running = false, stopAsked = false;
-
-function bshow(kind, html) { const m = $('bmsg'); m.className = 'msg ' + kind; m.innerHTML = html; }
-
-async function uploadFile(file) {
-  if (!file || !needPass(bshow)) return;
-  if (!/\.(xlsx|csv)$/i.test(file.name)) return bshow('err', 'Choose an .xlsx or .csv file. Old .xls files: open in Excel and use Save As .xlsx.');
-  if (file.size > 5 * 1024 * 1024) return bshow('err', 'The file is larger than 5 MB.');
-  bulk = null;
-  $('bpreview').hidden = true;
-  bshow('info', `Reading <b>${esc(file.name)}</b>…`);
-  let mine;
-  try {
-    // Step 1: the server reads the file and finds duplicates inside it
-    const out = await api('ui/bulk/parse', { method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: file });
-    mine = bulk = { ...out, fileName: file.name, rows: out.rows.map(r => ({ ...r, warnings: [], checking: true, selected: false })) };
-    renderBulk();
-  } catch (err) {
-    return bshow('err', esc(err.message));
-  }
-  // Step 2: check the rows against Jira a few at a time, so every request stays short
-  const rows = mine.rows, size = mine.checkChunk || 10;
-  for (let i = 0; i < rows.length; i += size) {
-    if (bulk !== mine) return; // another file was chosen meanwhile
-    bshow('info', `Checking rows against Jira: ${i} of ${rows.length}…`);
-    const chunk = rows.slice(i, i + size);
-    try {
-      const out = await api('ui/bulk/check', postJson({ rows: chunk.map(r => ({ row: r.row, task: r.task })) }));
-      out.rows.forEach((c, j) => {
-        const r = chunk[j];
-        Object.assign(r, { task: c.task, errors: [...r.errors, ...c.errors], warnings: c.warnings, info: { ...r.info, ...c.info }, checking: false });
-        r.selected = !r.errors.length && !r.info.suggestUntick;
-      });
-    } catch (err) {
-      for (const r of rows.slice(i)) Object.assign(r, { errors: [...r.errors, 'Not checked: ' + err.message], checking: false, selected: false });
-      if (bulk === mine) { renderBulk(); bshow('err', 'Checking stopped: ' + esc(err.message)); }
-      return;
-    }
-    if (bulk === mine) renderBulk();
-  }
-  if (bulk === mine) $('bmsg').className = 'msg';
-}
-$('file').addEventListener('change', () => { uploadFile($('file').files[0]); $('file').value = ''; });
-for (const ev of ['dragenter', 'dragover']) $('drop').addEventListener(ev, () => $('drop').classList.add('over'));
-for (const ev of ['dragleave', 'drop']) $('drop').addEventListener(ev, () => $('drop').classList.remove('over'));
-
-const sendable = r => r.selected && !r.done && !r.checking && !r.errors.length;
-
-// "Possible duplicate" lines with links to the matching Jira tickets / file rows
-function duplicateNotes(info) {
-  const out = [];
-  if (info.duplicates?.length)
-    out.push('Same title already in Jira: ' + info.duplicates.map(d => `${link(d.url, d.key)} (${esc(d.status)})`).join(', '));
-  if (info.sameTitleRow) out.push(`Same title as row ${info.sameTitleRow} in this file`);
-  return out;
-}
-
-function checksCell(r) {
-  if (r.sending) return '<span class="muted">Sending…</span>';
-  if (r.checking) return '<span class="muted">Checking…</span>';
-  if (r.result?.ok) {
-    const what = r.result.actions.includes('created') ? 'Created' : 'Updated';
-    return `<div class="good">✓ ${what} ${link(r.result.url, r.result.jiraKey)}</div>` +
-      (r.result.warning ? `<div class="warnt">${esc(r.result.warning)}</div>` : '');
-  }
-  if (r.result) return `<div class="errt">✗ ${esc(r.result.error)}</div>`;
-  const lines = r.errors.map(x => `<div class="errt">✗ ${esc(x)}</div>`)
-    .concat(duplicateNotes(r.info).map(x => `<div class="warnt">! Possible duplicate. ${x}. Tick the row only if you want another ticket.</div>`))
-    .concat(r.warnings.map(x => `<div class="warnt">! ${esc(x)}</div>`));
-  return lines.join('') || '<span class="good">Ready</span>';
-}
-
-function renderBulk() {
-  const rows = bulk.rows;
-  const checking = rows.filter(r => r.checking).length;
-  // Each row is counted once: still checking, with problems, possible duplicate, or ready
-  const problems = rows.filter(r => !r.checking && r.errors.length).length;
-  const maybeDupes = rows.filter(r => !r.checking && !r.errors.length && r.info.suggestUntick).length;
-  const todo = rows.filter(sendable);
-  const creates = todo.filter(r => r.info.action === 'create').length, updates = todo.length - creates;
-  $('bsummary').innerHTML = `<b>${esc(bulk.fileName)}</b>: ${rows.length} row${rows.length === 1 ? '' : 's'} · ` +
-    (checking ? `<span class="muted">${checking} still being checked</span> · ` : '') +
-    `<span class="good">${rows.length - checking - problems - maybeDupes} ready</span>` +
-    (maybeDupes ? ` · <span class="warnt">${maybeDupes} possible duplicate${maybeDupes === 1 ? '' : 's'} (unticked)</span>` : '') +
-    (problems ? ` · <span class="errt">${problems} with problems (not sent)</span>` : '') +
-    (bulk.ignoredColumns.length ? ` · <span class="muted">ignored columns: ${esc(bulk.ignoredColumns.join(', '))}</span>` : '');
-
-  const eligible = rows.filter(r => !r.errors.length && !r.done && !r.checking);
-  const allOn = eligible.length && eligible.every(r => r.selected);
-  const cell = v => `<td>${esc(v || '')}</td>`;
-  $('btable').innerHTML =
-    `<thead><tr><th><input type="checkbox" id="ball" aria-label="Tick all ready rows" ${allOn ? 'checked' : ''} ${running || !eligible.length ? 'disabled' : ''}></th>` +
-    '<th>Row</th><th>Will</th><th>Checks / result</th><th>Title</th><th>Assignee</th><th>Parent</th><th>Start</th><th>End</th>' +
-    '<th>Estimate</th><th>Sprint</th><th>Labels</th><th>Fix version</th><th>Priority</th><th>Status</th></tr></thead><tbody>' +
-    rows.map((r, i) => {
-      const t = r.task, d = t.description || '';
-      const will = r.info.action === 'update' ? `Update ${link(r.info.url, r.info.existingKey)}` : r.info.action === 'create' ? 'Create' : '–';
-      return `<tr class="${r.errors.length ? 'bad' : ''}">` +
-        `<td><input type="checkbox" data-i="${i}" aria-label="Send row ${r.row}" ${r.selected && !r.done ? 'checked' : ''} ${r.errors.length || r.done || r.checking || running ? 'disabled' : ''}></td>` +
-        `<td>${r.row}</td><td>${will}</td><td class="wrap checks">${checksCell(r)}</td>` +
-        `<td class="wrap">${esc(t.title || '')}${d ? `<div class="muted">${esc(d.length > 90 ? d.slice(0, 90) + '…' : d)}</div>` : ''}</td>` +
-        `<td title="${esc(t.assigneeEmail || '')}">${esc(r.info.assigneeName || t.assigneeEmail || '')}</td>` +
-        `<td title="${esc(r.info.parentSummary || '')}">${esc(t.parentKey || '')}</td>` +
-        cell(t.startDate) + cell(t.dueDate) + cell(t.originalEstimate) + cell(t.sprint) + cell(t.labels) + cell(t.fixVersions) +
-        cell(t.priority) + cell(r.info.statusName || t.status) + '</tr>';
-    }).join('') + '</tbody>';
-
-  $('bgo').textContent = todo.length
-    ? `Send ${todo.length} to Jira (${creates} new, ${updates} update${updates === 1 ? '' : 's'})` : 'Nothing ticked to send';
-  $('bgo').disabled = running || !!checking || !todo.length;
-  $('breset').disabled = running;
-  $('bstop').hidden = !running;
-  $('bpreview').hidden = false;
-}
-
-$('btable').addEventListener('change', e => {
-  if (!bulk || running) return;
-  if (e.target.id === 'ball') bulk.rows.forEach(r => { if (!r.errors.length && !r.done && !r.checking) r.selected = e.target.checked; });
-  else if (e.target.dataset.i) bulk.rows[+e.target.dataset.i].selected = e.target.checked;
-  renderBulk();
-});
-
-$('bgo').addEventListener('click', async () => {
-  const todo = bulk?.rows.filter(sendable) || [];
-  if (!todo.length || running || !needPass(bshow)) return;
-  running = true; stopAsked = false;
-  $('bstop').disabled = false; $('bstop').textContent = 'Stop after this row';
-  let created = 0, updated = 0, failed = 0, halted = '';
-  bshow('info', `Sending ${todo.length} row${todo.length === 1 ? '' : 's'} to Jira, one at a time…`);
-  for (const r of todo) {
-    if (stopAsked) { halted = 'Stopped before the remaining rows.'; break; }
-    r.sending = true; renderBulk();
-    try {
-      const out = await api('ui/task', { ...postJson(r.task), headers: { 'Content-Type': 'application/json', 'X-Source': 'bulk' } });
-      r.result = { ok: true, ...out };
-      r.done = true;
-      out.actions.includes('created') ? created++ : updated++;
-      sent();
-    } catch (err) {
-      r.result = { ok: false, error: err.message };
-      failed++;
-      // A wrong passcode or a stopped server will fail every row, so stop here
-      if (err.status === 401 || err.status === 503 || !err.status) { halted = 'Stopped: ' + err.message; r.sending = false; break; }
-    }
-    r.sending = false;
-  }
-  running = false;
-  renderBulk();
-  const summary = `Finished: ${created} created, ${updated} updated` + (failed ? `, ${failed} failed` : '') + '.';
-  bshow(failed || halted ? 'err' : 'ok', esc(summary) + (halted ? ' ' + esc(halted) : '') +
-    (failed || halted ? ' Rows that were not sent are still ticked; click Send again to retry them.' : ''));
-});
-$('bstop').addEventListener('click', () => { stopAsked = true; $('bstop').disabled = true; $('bstop').textContent = 'Stopping…'; });
-$('breset').addEventListener('click', () => {
-  bulk = null; $('bpreview').hidden = true; $('bmsg').className = 'msg';
-  $('file').click();
-});
-
-// Template is built here rather than downloaded, so it works even where the server isn't reachable
-$('tmpl').addEventListener('click', e => {
-  e.preventDefault();
-  const rows = [
-    ['Task ID', 'Jira key', 'Title', 'Description', 'Assignee', 'Parent ticket', 'Start date', 'End date',
-      'Original estimate', 'Sprint', 'Labels', 'Fix version', 'Priority', 'Status'],
-    ['T-2001', '', 'Example: configure outage SMS template (delete this row)', 'Set up the SMS text sent during outages.',
-      'name@company.com', '', '2026-10-20', '2026-10-24', '1d 4h', '', 'sms, outage', '', 'Medium', 'To Do'],
-  ];
-  downloadCsv('jira-bulk-template.csv', rows);
-});
-
-// ---------- Inbox: changes waiting for approval before they reach Jira ----------
-let inbox = { pending: [], decided: [], approvalMode: false };
-function ishow(kind, html) { const m = $('imsg'); m.className = 'msg ' + kind; m.innerHTML = html; }
-const when = iso => iso ? new Date(iso).toLocaleString() : '';
-const SOURCES = { portal: 'the portal', sheet: 'the Google Sheet' };
-
-async function loadInbox() {
-  if (!$('passcode').value) return;
-  try {
-    inbox = await api('ui/inbox');
-    renderInbox();
-  } catch (err) {
-    if (!$('inboxPanel').hidden) ishow('err', 'Inbox not loaded: ' + esc(err.message));
-  }
-}
-
-function inboxCard(it) {
-  const { task, errors, warnings, info } = it.check;
-  const update = info.action === 'update';
-  const fields = Object.keys(LABELS).filter(k => task[k] !== undefined && task[k] !== '' && !(k === 'assigneeEmail' && task.assigneeId));
-  const sameTask = inbox.pending.filter(x => x.task.taskId === it.task.taskId).length - 1;
-  return `<article class="item" data-id="${esc(it.id)}">` +
-    `<b>${update ? `Update ${link(info.url, info.existingKey)}` : `Create a new ticket in ${esc(project)}`}</b>` +
-    `<div class="muted">From ${esc(SOURCES[it.source] || it.source)} · Task ID ${esc(it.task.taskId)} · received ${esc(when(it.receivedAt))}</div>` +
-    (fields.length ? `<dl class="kv">${fields.map(k => `<dt>${LABELS[k]}</dt><dd>${esc(shownValue(k, task[k], info))}</dd>`).join('')}</dl>` : '') +
-    noteList('err', 'Problems (approving will fail until they are fixed at the source):', errors) +
-    (info.duplicates?.length ? `<div class="note warn"><b>Possible duplicate.</b> ${duplicateNotes(info)[0]}.</div>` : '') +
-    (sameTask > 0 ? `<div class="note warn">${sameTask} more change${sameTask > 1 ? 's' : ''} for this task ${sameTask > 1 ? 'are' : 'is'} waiting. Approve them in order, oldest first.</div>` : '') +
-    noteList('warn', 'Please note:', warnings) +
-    `<div class="row"><button class="primary" type="button" data-act="approve">Approve and send</button>` +
-    `<button class="ghost" type="button" data-act="reject">Reject</button></div><div class="msg" role="status"></div></article>`;
-}
-
-function renderInbox() {
-  const n = inbox.pending.length;
-  $('ibadge').hidden = !n;
-  $('ibadge').textContent = n;
-  $('imode').innerHTML = inbox.approvalMode
-    ? '<b>Approval is on.</b> Changes from the portal wait here. Nothing reaches Jira until you approve it.'
-    : '<b>Approval is off.</b> Portal changes are checked and sent to Jira straight away. To review them here first, set PORTAL_REQUIRE_APPROVAL=true on the server.';
-  $('ilist').innerHTML = n ? inbox.pending.map(inboxCard).join('') : '<p class="empty" style="margin-top:14px">No changes waiting.</p>';
-  $('idone').innerHTML = !inbox.decided.length ? '<p class="empty">Nothing decided yet.</p>' :
-    '<div class="scroll" style="border:0;margin:0"><table><tr><th>Decided</th><th>Task</th><th>From</th><th>Decision</th><th>By</th></tr>' +
-    inbox.decided.map(it => `<tr><td>${esc(when(it.decidedAt))}</td><td>${esc(it.task.taskId)}</td><td>${esc(it.source)}</td><td>` +
-      (it.status === 'approved'
-        ? `<span class="good">Approved</span> · ${link(it.result.url, it.result.jiraKey)} <span class="muted">(${esc(it.result.actions.join(', ') || 'no changes')})</span>`
-        : `<span class="errt">Rejected</span>${it.reason ? ` <span class="muted">${esc(it.reason)}</span>` : ''}`) +
-      `</td><td>${esc(it.decidedBy || '')}</td></tr>`).join('') + '</table></div>';
-}
-
-$('ilist').addEventListener('click', async e => {
-  const btn = e.target.closest('button[data-act]');
-  if (!btn || !needPass(ishow)) return;
-  const card = btn.closest('.item'), id = card.dataset.id, msg = card.querySelector('.msg');
-  const say = (kind, html) => { msg.className = 'msg ' + kind; msg.innerHTML = html; };
-  let reason = '';
-  if (btn.dataset.act === 'reject') {
-    reason = prompt('Reject this change? It will not be sent to Jira.\n\nReason (optional):');
-    if (reason === null) return;
-  }
-  card.querySelectorAll('button').forEach(b => { b.disabled = true; });
-  say('info', btn.dataset.act === 'approve' ? 'Checking again and sending to Jira…' : 'Rejecting…');
-  try {
-    const item = await api(`ui/inbox/${encodeURIComponent(id)}/${btn.dataset.act}`, postJson({ reason }));
-    if (item.status === 'approved') {
-      sent();
-      say('ok', `Sent: ${link(item.result.url, item.result.jiraKey)} (${esc(item.result.actions.join(', ') || 'no changes')})` +
-        (item.result.warning ? `<br>Note: ${esc(item.result.warning)}` : ''));
-    } else say('ok', 'Rejected. Nothing was sent to Jira.');
-    card.classList.add('gone');
-    setTimeout(loadInbox, 1500);
-  } catch (err) {
-    say('err', esc(err.message) + (err.errors?.length ? '<ul>' + err.errors.map(x => `<li>${esc(x)}</li>`).join('') + '</ul>' : ''));
-    card.querySelectorAll('button').forEach(b => { b.disabled = false; });
-  }
-});
-$('irefresh').addEventListener('click', loadInbox);
-// Keep the badge current while the page is open
-setInterval(() => { if (document.visibilityState === 'visible') loadInbox(); }, 30000);
-
-// ---------- Activity: everything sent to Jira, for everyone (kept on the server) ----------
-let acts = { items: [], next: '', more: false };
-const SOURCE_NAMES = { ui: 'Form', bulk: 'Bulk upload', portal: 'Portal', sheet: 'Google Sheet' };
-const FIELD_NAMES = { ...LABELS, assignee: 'Assignee', hoursSpent: 'Work logged' };
-function ashow(kind, html) { const m = $('amsg'); m.className = 'msg ' + kind; m.innerHTML = html; }
-const sourceText = e => (SOURCE_NAMES[e.source] || e.source) + (e.via === 'inbox' ? ' (approved in Inbox)' : '');
-
-function actionText(a) {
-  if (a === 'created') return 'Created';
-  if (a === 'updated') return 'Updated';
-  if (a === 'commented') return 'Comment added';
-  if (a.startsWith('transitioned:')) return 'Status → ' + a.slice(13);
-  if (a.startsWith('worklog:')) return 'Logged ' + a.slice(8);
-  return a;
-}
-const happened = e => e.ok
-  ? (e.actions.map(actionText).join(' · ') || 'No changes') + (e.changes?.length ? ` · changed: ${e.changes.map(c => FIELD_NAMES[c.field] || c.field).join(', ')}` : '')
-  : (e.refused ? '' : 'Failed: ') + (e.error || '');
-
-// Date boxes are local days; the server gets them as times (end day is included)
-const dayMs = (v, nextDay) => v ? new Date(v + 'T00:00:00').getTime() + (nextDay ? 86400000 : 0) : '';
-function activityParams(extra = {}) {
-  const p = { q: $('aq').value.trim(), source: $('asource').value, result: $('aresult').value,
-    from: dayMs($('afrom').value), to: dayMs($('ato').value, true), ...extra };
-  return new URLSearchParams(Object.entries(p).filter(([, v]) => v !== '' && v != null));
-}
-
-async function loadActivity(more = false) {
-  if (!$('passcode').value) return;
-  try {
-    const out = await api('ui/activity?' + activityParams(more ? { before: acts.next } : {}));
-    acts = more ? { ...out, items: [...acts.items, ...out.items] } : out;
-    renderActivity();
-    if ($('amsg').classList.contains('err')) $('amsg').className = 'msg';
-  } catch (err) {
-    ashow('err', 'History not loaded: ' + esc(err.message));
-  }
-}
-
-function renderActivity() {
-  const rows = acts.items;
-  $('acount').textContent = rows.length ? `${rows.length}${acts.more ? '+' : ''} shown` : '';
-  $('amore').hidden = !acts.more;
-  $('atable').innerHTML = !rows.length ? '<tr><td class="empty">Nothing matches.</td></tr>' :
-    '<thead><tr><th>When</th><th>From</th><th>By</th><th>Task</th><th>Jira</th><th>What happened</th><th></th></tr></thead><tbody>' +
-    rows.map((e, i) => `<tr class="hit${e.ok ? '' : ' failed'}" data-i="${i}">` +
-      `<td>${esc(when(e.at))}</td><td>${esc(sourceText(e))}</td><td>${esc(e.by || '')}</td>` +
-      `<td>${esc(e.taskId)}${e.title ? `<div class="muted">${esc(e.title.length > 60 ? e.title.slice(0, 60) + '…' : e.title)}</div>` : ''}</td>` +
-      `<td>${e.jiraKey ? (e.url ? link(e.url, e.jiraKey) : esc(e.jiraKey)) : ''}</td>` +
-      `<td class="wrap ${e.ok ? '' : 'errt'}">${esc(happened(e))}${e.warning ? `<div class="warnt">${esc(e.warning)}</div>` : ''}</td>` +
-      `<td>${!e.ok && !e.refused && e.task ? '<button class="ghost" type="button" data-retry>Retry</button>' : ''}</td></tr>`).join('') + '</tbody>';
-}
-
-$('atable').addEventListener('click', e => {
-  const tr = e.target.closest('tr[data-i]');
-  if (!tr || e.target.closest('a')) return;
-  const entry = acts.items[+tr.dataset.i];
-  if (e.target.closest('button[data-retry]')) retry(entry); else openTimeline(entry);
-});
-
-let aTimer = null;
-$('aq').addEventListener('input', () => { clearTimeout(aTimer); aTimer = setTimeout(() => loadActivity(), 350); });
-for (const id of ['asource', 'aresult', 'afrom', 'ato']) $(id).addEventListener('change', () => loadActivity());
-$('arefresh').addEventListener('click', () => loadActivity());
-$('amore').addEventListener('click', () => loadActivity(true));
-
-// ---------- One task's full history ----------
-function changeTable(changes) {
-  if (!changes?.length) return '';
-  const cell = v => `<td><div>${esc(v)}</div></td>`;
-  return '<table class="chg"><tr><th>Field</th><th>Before</th><th>After</th></tr>' + changes.map(c =>
-    `<tr><td>${esc(FIELD_NAMES[c.field] || c.field)}</td>` +
-    (c.before === '?' ? '<td class="muted">unknown</td>' : cell(c.before)) +
-    (c.after === '' && c.before ? '<td class="removed">removed</td>' : cell(c.after)) + '</tr>').join('') + '</table>';
-}
-
-async function openTimeline(entry) {
-  $('tlTitle').innerHTML = `Task ${esc(entry.taskId)}` + (entry.url ? ` · ${link(entry.url, entry.jiraKey)}` : entry.jiraKey ? ` · ${esc(entry.jiraKey)}` : '');
-  $('tlBody').innerHTML = '<p class="muted">Loading…</p>';
-  $('tl').showModal();
-  try {
-    const q = new URLSearchParams({ taskId: entry.taskId, ...(entry.jiraKey && { jiraKey: entry.jiraKey }) });
-    const { items } = await api('ui/activity/task?' + q);
-    $('tlBody').innerHTML = !items.length ? '<p class="empty">No history.</p>' : items.map(e =>
-      `<div class="item"><b>${esc(when(e.at))}</b> <span class="muted">· ${esc(sourceText(e))}${e.by ? ' · ' + esc(e.by) : ''}</span>` +
-      `<div class="${e.ok ? '' : 'errt'}" style="margin-top:4px">${esc(happened(e).replace(/ · changed: .*$/, ''))}</div>` +
-      (e.warning ? `<div class="warnt">${esc(e.warning)}</div>` : '') + changeTable(e.changes) + '</div>').join('');
-  } catch (err) {
-    $('tlBody').innerHTML = `<p class="errt">${esc(err.message)}</p>`;
-  }
-}
-$('tlClose').addEventListener('click', () => $('tl').close());
-
-// ---------- Retry a failed send: the normal preview first, then send ----------
-async function retry(entry) {
-  if (!needPass(ashow)) return;
-  ashow('info', `Checking task ${esc(entry.taskId)} against Jira again…`);
-  try {
-    pending = await api('ui/preview', postJson(entry.task));
-    pendingFrom = 'activity';
-    $('amsg').className = 'msg';
-    openPreview(pending);
-  } catch (err) {
-    ashow('err', 'Could not check it: ' + esc(err.message));
-  }
-}
-async function retrySend(task) {
-  pendingFrom = '';
-  ashow('info', 'Sending…');
-  try {
-    const out = await api('ui/task', postJson(task));
-    ashow('ok', `Sent: ${link(out.url, out.jiraKey)} (${esc(out.actions.map(actionText).join(', ') || 'no changes')})` + (out.warning ? `<br>Note: ${esc(out.warning)}` : ''));
-  } catch (err) {
-    ashow('err', 'Failed again: ' + esc(err.message));
-  }
-  loadActivity();
-}
-
-// ---------- CSV of what the filters show (up to 500 rows) ----------
-function downloadCsv(name, rows) {
-  const csv = rows.map(r => r.map(v => { v = String(v ?? ''); return /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v; }).join(',')).join('\r\n') + '\r\n';
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' })); // BOM so Excel reads UTF-8
-  a.download = name;
-  document.body.append(a); a.click(); a.remove();
-  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-}
-$('acsv').addEventListener('click', async () => {
-  if (!needPass(ashow)) return;
-  try {
-    const { items, more } = await api('ui/activity?' + activityParams({ limit: 500 }));
-    downloadCsv(`jira-activity-${new Date().toISOString().slice(0, 10)}.csv`, [
-      ['When', 'From', 'By', 'Task ID', 'Jira key', 'Title', 'Result', 'What happened', 'Changes', 'Error'],
-      ...items.map(e => [e.at, sourceText(e), e.by, e.taskId, e.jiraKey, e.title, e.ok ? 'Sent' : e.refused ? 'Refused' : 'Failed',
-        e.ok ? e.actions.map(actionText).join('; ') : '',
-        (e.changes || []).map(c => `${FIELD_NAMES[c.field] || c.field}: ${c.before || '(empty)'} -> ${c.after || '(empty)'}`).join('; '),
-        e.error || '']),
-    ]);
-    ashow('ok', `Exported ${items.length} row${items.length === 1 ? '' : 's'}.` + (more ? ' Only the newest 500 are included; narrow the filters to export the rest.' : ''));
-  } catch (err) {
-    ashow('err', 'Export failed: ' + esc(err.message));
-  }
-});
-
-$('passcode').addEventListener('change', () => { store.set('jira.passcode', $('passcode').value); loadOptions(); pullFromJira(); loadInbox(); });
-
-showTab(store.get('jira.tab', 'single'));
-loadOptions();
-loadInbox();
-</script>
+<script src="js/core.js"></script>
+<script src="js/single.js"></script>
+<script src="js/bulk.js"></script>
+<script src="js/inbox.js"></script>
+<script src="js/activity.js"></script>
+<script src="js/fields.js"></script>
+<script src="js/ai.js"></script>
+<script src="js/start.js"></script>
 </body>
 </html>

@@ -5,6 +5,9 @@
 //   lib/bulk.js   read .xlsx / CSV uploads into tasks
 //   lib/activity.js  history of every send (syncAndRecord is how routes send to Jira)
 //   lib/inbox.js  changes waiting for approval before they reach Jira
+//   lib/fields.js Jira's field list and which fields the form shows
+//   lib/ai.js     AI suggestions (optional)
+//   lib/sheet.js  Google Sheet sync through the Inbox (optional; lib/google.js talks to Google)
 //   lib/store.js  small key/value store that survives restarts
 //   lib/log.js    JSON log lines and the shared error reply shape
 //
