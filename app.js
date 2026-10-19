@@ -3,7 +3,9 @@
 //   lib/sync.js   create/update the issue, status transition, comment, worklog (only writer to Jira)
 //   lib/check.js  check a task against Jira without changing anything
 //   lib/bulk.js   read .xlsx / CSV uploads into tasks
+//   lib/inbox.js  changes waiting for approval before they reach Jira
 //   lib/store.js  small key/value store that survives restarts
+//   lib/log.js    JSON log lines and the shared error reply shape
 //
 // Runs two ways: server.js starts it on this computer (npm start), and
 // netlify/functions/api.mjs runs it as a Netlify Function. Node 22.12+ (global fetch; @netlify/blobs needs 22.12).

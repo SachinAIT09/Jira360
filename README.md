@@ -150,10 +150,33 @@ Check the rule's **Audit log** in Jira if nothing happens.
 - Updates summary, description, due date, priority, assignee (looked up by email)
 - Transitions to the mapped status by reading the issue's available transitions (works with any workflow)
 - Adds a comment and a worklog when provided
-- HMAC-signed requests from the portal; duplicate events ignored via `X-Event-Id`
+- HMAC-signed requests from the portal; duplicate events ignored via `X-Event-Id` (remembered across restarts)
+- **Checks every task first**, like the form's preview: dates, assignee, sprint, priority, status, parent, hours. A task with problems is refused and nothing reaches Jira
+- **Optional approval:** with `PORTAL_REQUIRE_APPROVAL=true`, good tasks wait in the page's **Inbox** tab until someone approves them
 - Retries on Jira 429/5xx with backoff
 - Returns `jiraKey` so the portal can store it
-- Optional: Jira status changes pushed back to the portal (`/jira/webhook`), with a loop guard that ignores the integration user's own edits
+- Optional: Jira changes pushed back to the portal (`/jira/webhook`): status, assignee, due date and new comments, with a loop guard that ignores the integration user's own edits
+
+### Replies to the portal
+| Reply | Meaning |
+|---|---|
+| `200 { taskId, jiraKey, actions, warning?, warnings? }` | Sent to Jira. `warnings` lists things like a possible duplicate title |
+| `202 { taskId, queued: true, inboxId, action }` | Approval is on: waiting in the Inbox. Nothing sent yet |
+| `200 { ..., duplicate: true }` | This `X-Event-Id` was handled before; the earlier answer is repeated (after approval: the Jira result; after rejection: `rejected: true`) |
+| `400 { error, code: "invalid", errors: [...] }` | The task has problems (listed). Nothing was sent. Fix it and send again; the same event id may be reused |
+| `401 { code: "bad_signature" }` | Signature doesn't match |
+| `502 { code: "jira_error" }` | Jira refused or failed; safe to retry |
+
+Every error reply has the same shape: `{ error, code, errors? }`.
+
+### Approving portal changes (Inbox)
+1. Set `PORTAL_REQUIRE_APPROVAL=true` and restart (or redeploy on Netlify).
+2. Open the page and the **Inbox** tab. A badge shows how many changes are waiting.
+3. Each change shows what will happen (create, or update with a link to the ticket), the values, and any problems or possible duplicates.
+4. **Approve and send** checks it against Jira again (Jira may have changed while it waited) and then sends it. **Reject** drops it; a reason is optional.
+5. Type your name in the Inbox so each decision records who made it. The "Recently decided" list shows the last 30.
+
+On Netlify, waiting changes are kept in Netlify Blobs; on your computer, in `data/`.
 
 ### Run it
 ```bash
@@ -180,8 +203,16 @@ Call `pushTaskToJira(task)` after save and store the returned `jiraKey` on the t
 
 ### Optional: Jira → portal
 1. Set `PORTAL_CALLBACK_URL` and `JIRA_WEBHOOK_SECRET`.
-2. Jira → Settings → System → WebHooks → Create: URL `https://<host>/jira/webhook?secret=<JIRA_WEBHOOK_SECRET>`, event *Issue updated*, JQL `project = PCAI`.
-3. The portal receives `{ taskId, jiraKey, status }` signed with `X-Jira-Signature` (HMAC-SHA256, same shared secret).
+2. Jira → Settings → System → WebHooks → Create: URL `https://<host>/jira/webhook?secret=<JIRA_WEBHOOK_SECRET>`, events *Issue updated* and *Comment created*, JQL `project = PCAI`.
+3. The portal receives, signed with `X-Jira-Signature` (HMAC-SHA256, same shared secret):
+   ```json
+   { "taskId": "T-1001", "jiraKey": "PCAI-123", "event": "updated", "status": "Done",
+     "changes": { "status": "Done", "assignee": { "id": "<accountId>", "name": "Asha" }, "dueDate": "2026-12-01" } }
+
+   { "taskId": "T-1001", "jiraKey": "PCAI-123", "event": "commented",
+     "comment": { "id": "10077", "author": "Asha", "body": "Looks good", "created": "2026-10-19T10:00:00.000+0000" } }
+   ```
+   `changes` holds only what changed (`assignee: null` = unassigned). `status` is also at the top level, as in the first version. Changes and comments made by the integration user itself are not sent back.
 
 ### Deploy
 Any place that runs Node: a small VM, container (Cloud Run / ECS / AKS), or an existing internal server. One instance is fine; if you run more than one, note that `data/` is per machine: point `lib/store.js` at a shared store (Redis, Netlify Blobs) instead.

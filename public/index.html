@@ -105,6 +105,13 @@
   .note.err { background: var(--err-bg); color: var(--err); }
   .note.warn { background: var(--warn-bg); color: var(--warn); }
   .note ul { margin: 4px 0 0; padding-left: 18px; }
+  /* Inbox */
+  .badge { display: inline-block; min-width: 20px; margin-left: 6px; padding: 0 6px; border-radius: 999px; background: var(--accent); color: var(--accent-text); font-size: 12px; line-height: 20px; text-align: center; }
+  .ihead { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+  .item { margin-top: 14px; padding: 16px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); }
+  .item .row { margin-top: 14px; }
+  .item .msg { margin-top: 12px; }
+  .item.gone { opacity: .55; }
   @media (max-width: 600px) { .grid { grid-template-columns: 1fr; } dl.kv { grid-template-columns: 1fr; gap: 2px; } dl.kv dd { margin-bottom: 8px; } }
 </style>
 </head>
@@ -122,6 +129,7 @@
   <div class="tabs" role="tablist">
     <button type="button" role="tab" id="tabSingle" aria-controls="singlePanel" aria-selected="true">Single ticket</button>
     <button type="button" role="tab" id="tabBulk" aria-controls="bulkPanel" aria-selected="false">Bulk upload (Excel / CSV)</button>
+    <button type="button" role="tab" id="tabInbox" aria-controls="inboxPanel" aria-selected="false">Inbox<span id="ibadge" class="badge" hidden></span></button>
   </div>
 
   <section id="singlePanel" role="tabpanel" aria-labelledby="tabSingle">
@@ -239,6 +247,23 @@
     </div>
   </section>
 
+  <section id="inboxPanel" role="tabpanel" aria-labelledby="tabInbox" hidden>
+    <div class="card">
+      <div class="ihead">
+        <p id="imode" class="hint"></p>
+        <button class="ghost" id="irefresh" type="button">Refresh</button>
+      </div>
+      <div class="row">
+        <label for="iby" style="margin:0">Your name <span class="opt">(saved with each approval or rejection)</span></label>
+        <input id="iby" autocomplete="name" style="max-width:220px">
+      </div>
+      <div id="imsg" class="msg" role="status"></div>
+      <div id="ilist"></div>
+      <h2>Recently decided</h2>
+      <div id="idone"><p class="empty">Nothing decided yet.</p></div>
+    </div>
+  </section>
+
   <h2>Recent posts (this browser)</h2>
   <div id="hist"></div>
 </main>
@@ -278,7 +303,7 @@ async function api(path, opts = {}) {
   const out = await res.json().catch(() => ({ error: res.status === 404 || res.status === 405
     ? "This page can't find its Jira server. Open the form from the address where server.js runs (for example http://<that computer>:8080/)."
     : `HTTP ${res.status}` }));
-  if (!res.ok) throw Object.assign(new Error(out.error || `HTTP ${res.status}`), { status: res.status });
+  if (!res.ok) throw Object.assign(new Error(out.error || `HTTP ${res.status}`), { status: res.status, errors: out.errors });
   return out;
 }
 const postJson = body => ({ method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
@@ -307,17 +332,18 @@ function remember(taskId, out) {
 }
 
 // ---------- Tabs ----------
+const TABS = { single: ['tabSingle', 'singlePanel'], bulk: ['tabBulk', 'bulkPanel'], inbox: ['tabInbox', 'inboxPanel'] };
 function showTab(name) {
-  const bulkTab = name === 'bulk';
-  $('singlePanel').hidden = bulkTab;
-  $('bulkPanel').hidden = !bulkTab;
-  $('tabSingle').setAttribute('aria-selected', String(!bulkTab));
-  $('tabBulk').setAttribute('aria-selected', String(bulkTab));
-  document.querySelector('main').classList.toggle('wide', bulkTab);
+  if (!TABS[name]) name = 'single';
+  for (const [k, [tab, panel]] of Object.entries(TABS)) {
+    $(panel).hidden = k !== name;
+    $(tab).setAttribute('aria-selected', String(k === name));
+  }
+  document.querySelector('main').classList.toggle('wide', name === 'bulk');
   store.set('jira.tab', name);
+  if (name === 'inbox') loadInbox();
 }
-$('tabSingle').addEventListener('click', () => showTab('single'));
-$('tabBulk').addEventListener('click', () => showTab('bulk'));
+for (const name of Object.keys(TABS)) $(TABS[name][0]).addEventListener('click', () => showTab(name));
 
 // ---------- Lists from Jira (people, epics, sprints, versions, labels, priorities, statuses) ----------
 let opts = { users: [], parents: [], sprints: [], versions: [], labels: [], priorities: [], statuses: [] };
@@ -766,7 +792,7 @@ $('bgo').addEventListener('click', async () => {
     if (stopAsked) { halted = 'Stopped before the remaining rows.'; break; }
     r.sending = true; renderBulk();
     try {
-      const out = await api('ui/task', postJson(r.task));
+      const out = await api('ui/task', { ...postJson(r.task), headers: { 'Content-Type': 'application/json', 'X-Source': 'bulk' } });
       r.result = { ok: true, ...out };
       r.done = true;
       out.actions.includes('created') ? created++ : updated++;
@@ -808,11 +834,94 @@ $('tmpl').addEventListener('click', e => {
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 });
 
-$('passcode').addEventListener('change', () => { store.set('jira.passcode', $('passcode').value); loadOptions(); pullFromJira(); });
+// ---------- Inbox: changes waiting for approval before they reach Jira ----------
+let inbox = { pending: [], decided: [], approvalMode: false };
+$('iby').value = store.get('jira.name', '');
+$('iby').addEventListener('change', () => store.set('jira.name', $('iby').value.trim()));
+function ishow(kind, html) { const m = $('imsg'); m.className = 'msg ' + kind; m.innerHTML = html; }
+const when = iso => iso ? new Date(iso).toLocaleString() : '';
+const SOURCES = { portal: 'the portal', sheet: 'the Google Sheet' };
+
+async function loadInbox() {
+  if (!$('passcode').value) return;
+  try {
+    inbox = await api('ui/inbox');
+    renderInbox();
+  } catch (err) {
+    if (!$('inboxPanel').hidden) ishow('err', 'Inbox not loaded: ' + esc(err.message));
+  }
+}
+
+function inboxCard(it) {
+  const { task, errors, warnings, info } = it.check;
+  const update = info.action === 'update';
+  const fields = Object.keys(LABELS).filter(k => task[k] !== undefined && task[k] !== '' && !(k === 'assigneeEmail' && task.assigneeId));
+  const sameTask = inbox.pending.filter(x => x.task.taskId === it.task.taskId).length - 1;
+  return `<article class="item" data-id="${esc(it.id)}">` +
+    `<b>${update ? `Update ${link(info.url, info.existingKey)}` : `Create a new ticket in ${esc(project)}`}</b>` +
+    `<div class="muted">From ${esc(SOURCES[it.source] || it.source)} · Task ID ${esc(it.task.taskId)} · received ${esc(when(it.receivedAt))}</div>` +
+    (fields.length ? `<dl class="kv">${fields.map(k => `<dt>${LABELS[k]}</dt><dd>${esc(shownValue(k, task[k], info))}</dd>`).join('')}</dl>` : '') +
+    noteList('err', 'Problems (approving will fail until they are fixed at the source):', errors) +
+    (info.duplicates?.length ? `<div class="note warn"><b>Possible duplicate.</b> ${duplicateNotes(info)[0]}.</div>` : '') +
+    (sameTask > 0 ? `<div class="note warn">${sameTask} more change${sameTask > 1 ? 's' : ''} for this task ${sameTask > 1 ? 'are' : 'is'} waiting. Approve them in order, oldest first.</div>` : '') +
+    noteList('warn', 'Please note:', warnings) +
+    `<div class="row"><button class="primary" type="button" data-act="approve">Approve and send</button>` +
+    `<button class="ghost" type="button" data-act="reject">Reject</button></div><div class="msg" role="status"></div></article>`;
+}
+
+function renderInbox() {
+  const n = inbox.pending.length;
+  $('ibadge').hidden = !n;
+  $('ibadge').textContent = n;
+  $('imode').innerHTML = inbox.approvalMode
+    ? '<b>Approval is on.</b> Changes from the portal wait here. Nothing reaches Jira until you approve it.'
+    : '<b>Approval is off.</b> Portal changes are checked and sent to Jira straight away. To review them here first, set PORTAL_REQUIRE_APPROVAL=true on the server.';
+  $('ilist').innerHTML = n ? inbox.pending.map(inboxCard).join('') : '<p class="empty" style="margin-top:14px">No changes waiting.</p>';
+  $('idone').innerHTML = !inbox.decided.length ? '<p class="empty">Nothing decided yet.</p>' :
+    '<div class="scroll" style="border:0;margin:0"><table><tr><th>Decided</th><th>Task</th><th>From</th><th>Decision</th><th>By</th></tr>' +
+    inbox.decided.map(it => `<tr><td>${esc(when(it.decidedAt))}</td><td>${esc(it.task.taskId)}</td><td>${esc(it.source)}</td><td>` +
+      (it.status === 'approved'
+        ? `<span class="good">Approved</span> · ${link(it.result.url, it.result.jiraKey)} <span class="muted">(${esc(it.result.actions.join(', ') || 'no changes')})</span>`
+        : `<span class="errt">Rejected</span>${it.reason ? ` <span class="muted">${esc(it.reason)}</span>` : ''}`) +
+      `</td><td>${esc(it.decidedBy || '')}</td></tr>`).join('') + '</table></div>';
+}
+
+$('ilist').addEventListener('click', async e => {
+  const btn = e.target.closest('button[data-act]');
+  if (!btn || !needPass(ishow)) return;
+  const card = btn.closest('.item'), id = card.dataset.id, msg = card.querySelector('.msg');
+  const say = (kind, html) => { msg.className = 'msg ' + kind; msg.innerHTML = html; };
+  let reason = '';
+  if (btn.dataset.act === 'reject') {
+    reason = prompt('Reject this change? It will not be sent to Jira.\n\nReason (optional):');
+    if (reason === null) return;
+  }
+  card.querySelectorAll('button').forEach(b => { b.disabled = true; });
+  say('info', btn.dataset.act === 'approve' ? 'Checking again and sending to Jira…' : 'Rejecting…');
+  try {
+    const item = await api(`ui/inbox/${encodeURIComponent(id)}/${btn.dataset.act}`, postJson({ by: $('iby').value.trim(), reason }));
+    if (item.status === 'approved') {
+      remember(item.task.taskId, item.result);
+      say('ok', `Sent: ${link(item.result.url, item.result.jiraKey)} (${esc(item.result.actions.join(', ') || 'no changes')})` +
+        (item.result.warning ? `<br>Note: ${esc(item.result.warning)}` : ''));
+    } else say('ok', 'Rejected. Nothing was sent to Jira.');
+    card.classList.add('gone');
+    setTimeout(loadInbox, 1500);
+  } catch (err) {
+    say('err', esc(err.message) + (err.errors?.length ? '<ul>' + err.errors.map(x => `<li>${esc(x)}</li>`).join('') + '</ul>' : ''));
+    card.querySelectorAll('button').forEach(b => { b.disabled = false; });
+  }
+});
+$('irefresh').addEventListener('click', loadInbox);
+// Keep the badge current while the page is open
+setInterval(() => { if (document.visibilityState === 'visible') loadInbox(); }, 30000);
+
+$('passcode').addEventListener('change', () => { store.set('jira.passcode', $('passcode').value); loadOptions(); pullFromJira(); loadInbox(); });
 
 showTab(store.get('jira.tab', 'single'));
 renderHistory();
 loadOptions();
+loadInbox();
 </script>
 </body>
 </html>
