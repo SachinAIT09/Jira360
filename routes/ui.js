@@ -2,9 +2,10 @@
 
 import crypto from 'node:crypto';
 import express from 'express';
-import { BASE, JIRA_ISSUE_TYPE, JIRA_PROJECT_KEY, PORTAL_REQUIRE_APPROVAL, UI_PASSCODE } from '../lib/config.js';
-import { jira, lists, adfToText, customFieldIds } from '../lib/jira.js';
-import { findIssue, syncTaskQueued } from '../lib/sync.js';
+import { JIRA_ISSUE_TYPE, JIRA_PROJECT_KEY, PORTAL_REQUIRE_APPROVAL, UI_PASSCODE } from '../lib/config.js';
+import { jira, lists, readIssue, browseUrl } from '../lib/jira.js';
+import { findIssue } from '../lib/sync.js';
+import { syncAndRecord, listActivity, taskActivity } from '../lib/activity.js';
 import { checkTask, previewContext } from '../lib/check.js';
 import { readBulkFile, mapLimit, CHECK_CHUNK } from '../lib/bulk.js';
 import { listInbox, approve, reject } from '../lib/inbox.js';
@@ -12,6 +13,12 @@ import { log, logError, fail, sendError } from '../lib/log.js';
 
 const router = express.Router();
 export default router;
+
+// Who is using the page, as typed in its "Your name" box (the passcode is shared, so this is a
+// name for the history, not a login). Sent URI-encoded so any language works in a header.
+function userOf(req) {
+  try { return decodeURIComponent(req.get('X-User-Name') || '').trim().slice(0, 80); } catch { return ''; }
+}
 
 function uiAuth(req, res, next) {
   if (!UI_PASSCODE) return fail(res, 503, 'not_configured', 'Form disabled: set UI_PASSCODE on the server');
@@ -41,39 +48,11 @@ router.get('/ui/issue', uiAuth, async (req, res) => {
   try {
     const found = await findIssue({ jiraKey, taskId: taskId || '' });
     if (!found) return fail(res, 404, 'not_found', 'No ticket found', { notFound: true });
-    const ids = await customFieldIds();
-    const fieldList = ['summary', 'description', 'assignee', 'parent', 'duedate', 'priority', 'status',
-      'labels', 'fixVersions', 'timetracking', 'updated', ids.sprint, ids.startDate].filter(Boolean).join(',');
-    const [{ key, fields: f }, { transitions = [] }] = await Promise.all([
-      jira('GET', `/rest/api/3/issue/${encodeURIComponent(found.key)}?fields=${fieldList}`),
+    const [issue, { transitions = [] }] = await Promise.all([
+      readIssue(found.key),
       jira('GET', `/rest/api/3/issue/${encodeURIComponent(found.key)}/transitions`).catch(() => ({})),
     ]);
-    const sprints = (ids.sprint && f[ids.sprint]) || [];
-    const sprint = sprints.find(s => s.state === 'active') || sprints.find(s => s.state === 'future') || sprints.at(-1);
-    res.json({
-      jiraKey: key,
-      url: `${BASE}/browse/${key}`,
-      updated: f.updated,
-      statusName: f.status?.name || '',
-      nextStatuses: [...new Set(transitions.map(t => t.to?.name).filter(Boolean))],
-      assignee: f.assignee ? { id: f.assignee.accountId, name: f.assignee.displayName } : null,
-      parent: f.parent ? { key: f.parent.key, summary: f.parent.fields?.summary || '' } : null,
-      sprintState: sprint?.state || '',
-      values: {
-        title: f.summary || '',
-        description: adfToText(f.description).trim(),
-        assigneeId: f.assignee?.accountId || '',
-        parentKey: f.parent?.key || '',
-        startDate: (ids.startDate && f[ids.startDate]) || '',
-        dueDate: f.duedate || '',
-        originalEstimate: f.timetracking?.originalEstimate || '',
-        sprint: sprint?.name || '',
-        labels: (f.labels || []).filter(l => !l.startsWith('portal-')).join(', '),
-        fixVersions: (f.fixVersions || []).map(v => v.name).join(', '),
-        priority: f.priority?.name || '',
-        status: f.status?.name || '',
-      },
-    });
+    res.json({ ...issue, nextStatuses: [...new Set(transitions.map(t => t.to?.name).filter(Boolean))] });
   } catch (e) {
     sendError(res, e, 'ui', { jiraKey, taskId });
   }
@@ -111,16 +90,16 @@ router.post('/ui/task', uiAuth, async (req, res) => {
   const source = req.get('X-Source') === 'bulk' ? 'bulk' : 'ui';
   if (!task.taskId) return fail(res, 400, 'invalid', 'Task ID is required');
   try {
-    const result = await syncTaskQueued(task);
-    log(source, result);
-    res.json({ ...result, url: `${BASE}/browse/${result.jiraKey}` });
+    const result = await syncAndRecord(task, { source, by: userOf(req) });
+    log(source, { ...result, by: userOf(req) });
+    res.json({ ...result, url: browseUrl(result.jiraKey) });
   } catch (e) {
     sendError(res, e, source, { taskId: task.taskId });
   }
 });
 
 // ---------- Inbox: changes waiting for approval (portal now, Google Sheet later) ----------
-const withUrl = item => item.result?.jiraKey ? { ...item, result: { ...item.result, url: `${BASE}/browse/${item.result.jiraKey}` } } : item;
+const withUrl = item => item.result?.jiraKey ? { ...item, result: { ...item.result, url: browseUrl(item.result.jiraKey) } } : item;
 
 router.get('/ui/inbox', uiAuth, async (_req, res) => {
   try {
@@ -131,8 +110,8 @@ router.get('/ui/inbox', uiAuth, async (_req, res) => {
   }
 });
 
-// Who decided, as typed on the page (the passcode is shared, so this is a name, not a login)
-const decidedBy = req => String(req.body?.by || '').trim().slice(0, 80);
+// Who decided: the page's name box (older pages sent it in the body)
+const decidedBy = req => userOf(req) || String(req.body?.by || '').trim().slice(0, 80);
 
 router.post('/ui/inbox/:id/approve', uiAuth, async (req, res) => {
   try {
@@ -154,5 +133,27 @@ router.post('/ui/inbox/:id/reject', uiAuth, async (req, res) => {
   } catch (e) {
     if (e.status === 409) return fail(res, 409, 'conflict', e.message);
     sendError(res, e, 'inbox', { id: req.params.id });
+  }
+});
+
+// ---------- Activity: history of every send to Jira ----------
+const dayStart = v => (/^\d+$/.test(String(v || '')) ? Number(v) : 0); // the page sends local day bounds in ms
+
+router.get('/ui/activity', uiAuth, async (req, res) => {
+  const { q, source, result, from, to, before, limit } = req.query;
+  try {
+    res.json(await listActivity({ q, source, result, from: dayStart(from), to: dayStart(to), before, limit }));
+  } catch (e) {
+    sendError(res, e, 'activity');
+  }
+});
+
+router.get('/ui/activity/task', uiAuth, async (req, res) => {
+  const { taskId, jiraKey } = req.query;
+  if (!taskId && !jiraKey) return fail(res, 400, 'invalid', 'Give a task ID or Jira key');
+  try {
+    res.json({ items: await taskActivity({ taskId, jiraKey }) });
+  } catch (e) {
+    sendError(res, e, 'activity');
   }
 });

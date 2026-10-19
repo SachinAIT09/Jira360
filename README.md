@@ -36,9 +36,20 @@ Files:
 | `server.js` | Runs `app.js` on your computer (`npm start`) |
 | `netlify/functions/api.mjs`, `netlify.toml` | Runs `app.js` on Netlify |
 
+### Activity (history)
+
+The **Activity** tab lists everything sent to Jira from the form, bulk uploads, the portal and Inbox approvals. Everyone using the page sees the same history.
+- Each line shows when, where it came from, **who** (the "Your name" box next to the passcode), the task and ticket, and what happened. Failed sends are kept with their error.
+- **Search** by Task ID, Jira key, title or name. **Filter** by source, sent/failed and dates.
+- **Click a line** to see that task's full history, with each changed field's value **before → after**.
+- **Retry** on a failed line opens the normal review dialog, so the task is checked against Jira again before it is sent.
+- **Export CSV** saves what the filters show (newest 500).
+
+Portal tasks refused by the checks are listed too, as "Refused". They have no Retry: the portal has to send them again, fixed.
+
 ### Storage
 
-The server remembers which Jira ticket belongs to each task, and which portal events it has already handled, so a resend after a restart doesn't create a duplicate.
+The server remembers which Jira ticket belongs to each task, which portal events it has already handled (so a resend after a restart doesn't create a duplicate), the Inbox, and the Activity history.
 - On your computer it keeps these in the `data/` folder (not uploaded to git).
 - On Netlify it uses Netlify Blobs. Run `npm install @netlify/blobs` once before deploying. Without it the server falls back to temporary storage that is lost whenever Netlify restarts the function.
 

@@ -6,7 +6,7 @@
 import crypto from 'node:crypto';
 import express from 'express';
 import { PORTAL_REQUIRE_APPROVAL, PORTAL_SHARED_SECRET } from '../lib/config.js';
-import { syncTaskQueued } from '../lib/sync.js';
+import { syncAndRecord, record } from '../lib/activity.js';
 import { checkTask, previewContext } from '../lib/check.js';
 import { addToInbox } from '../lib/inbox.js';
 import { store } from '../lib/store.js';
@@ -44,6 +44,8 @@ router.post('/portal/task', async (req, res) => {
     const warnings = [...check.warnings, ...duplicateWarnings(check.info)];
     if (check.errors.length) {
       log('portal', { taskId: input.taskId, eventId, refused: check.errors });
+      await record({ source: 'portal', by: '', taskId: String(input.taskId), jiraKey: String(input.jiraKey || '').toUpperCase(),
+        title: input.title || '', task: input, ok: false, refused: true, error: 'Refused: ' + check.errors.join('; ') });
       // Not remembered: the portal can fix the task and send the same event again
       return fail(res, 400, 'invalid', 'The task has problems; nothing was sent to Jira', { errors: check.errors, warnings });
     }
@@ -56,7 +58,7 @@ router.post('/portal/task', async (req, res) => {
       return res.status(202).json({ ...queued, ...(warnings.length && { warnings }) });
     }
 
-    const result = await syncTaskQueued(check.task);
+    const result = await syncAndRecord(check.task, { source: 'portal' });
     await remember(eventId, result);
     log('portal', { ...result, eventId });
     res.json({ ...result, ...(warnings.length && { warnings }) });

@@ -3,6 +3,7 @@
 //   lib/sync.js   create/update the issue, status transition, comment, worklog (only writer to Jira)
 //   lib/check.js  check a task against Jira without changing anything
 //   lib/bulk.js   read .xlsx / CSV uploads into tasks
+//   lib/activity.js  history of every send (syncAndRecord is how routes send to Jira)
 //   lib/inbox.js  changes waiting for approval before they reach Jira
 //   lib/store.js  small key/value store that survives restarts
 //   lib/log.js    JSON log lines and the shared error reply shape

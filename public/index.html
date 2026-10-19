@@ -112,6 +112,20 @@
   .item .row { margin-top: 14px; }
   .item .msg { margin-top: 12px; }
   .item.gone { opacity: .55; }
+  /* Activity */
+  .filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px 12px; }
+  .filters .wide2 { grid-column: span 2; }
+  #atable tr.hit { cursor: pointer; }
+  #atable tr.hit:hover td { background: var(--bg); }
+  #atable tr.failed td { background: var(--err-bg); }
+  #atable td.wrap { min-width: 220px; max-width: 380px; }
+  #atable button { padding: 4px 10px; font-size: 13px; }
+  dialog.big { width: min(880px, calc(100% - 32px)); }
+  table.chg { margin-top: 10px; font-size: 13px; }
+  table.chg td { white-space: pre-wrap; overflow-wrap: anywhere; max-width: 320px; }
+  table.chg td div { max-height: 160px; overflow: auto; }
+  td.removed { color: var(--err); }
+  @media (max-width: 600px) { .filters .wide2 { grid-column: auto; } }
   @media (max-width: 600px) { .grid { grid-template-columns: 1fr; } dl.kv { grid-template-columns: 1fr; gap: 2px; } dl.kv dd { margin-bottom: 8px; } }
 </style>
 </head>
@@ -123,6 +137,8 @@
   <div class="card bar">
     <label for="passcode">Passcode</label>
     <input id="passcode" type="password" autocomplete="current-password">
+    <label for="who">Your name</label>
+    <input id="who" autocomplete="name" placeholder="Shown in the history">
     <span id="optsState" class="opt" role="status"></span>
   </div>
 
@@ -130,6 +146,7 @@
     <button type="button" role="tab" id="tabSingle" aria-controls="singlePanel" aria-selected="true">Single ticket</button>
     <button type="button" role="tab" id="tabBulk" aria-controls="bulkPanel" aria-selected="false">Bulk upload (Excel / CSV)</button>
     <button type="button" role="tab" id="tabInbox" aria-controls="inboxPanel" aria-selected="false">Inbox<span id="ibadge" class="badge" hidden></span></button>
+    <button type="button" role="tab" id="tabActivity" aria-controls="activityPanel" aria-selected="false">Activity</button>
   </div>
 
   <section id="singlePanel" role="tabpanel" aria-labelledby="tabSingle">
@@ -253,10 +270,6 @@
         <p id="imode" class="hint"></p>
         <button class="ghost" id="irefresh" type="button">Refresh</button>
       </div>
-      <div class="row">
-        <label for="iby" style="margin:0">Your name <span class="opt">(saved with each approval or rejection)</span></label>
-        <input id="iby" autocomplete="name" style="max-width:220px">
-      </div>
       <div id="imsg" class="msg" role="status"></div>
       <div id="ilist"></div>
       <h2>Recently decided</h2>
@@ -264,8 +277,28 @@
     </div>
   </section>
 
-  <h2>Recent posts (this browser)</h2>
-  <div id="hist"></div>
+  <section id="activityPanel" role="tabpanel" aria-labelledby="tabActivity" hidden>
+    <div class="card">
+      <p class="hint">Everything sent to Jira from this page, bulk uploads and the portal, for everyone. Click a row to see that task's full history.</p>
+      <div class="filters" style="margin-top:14px">
+        <div class="wide2"><label for="aq">Search</label><input id="aq" type="search" placeholder="Task ID, Jira key, title or name"></div>
+        <div><label for="asource">From</label>
+          <select id="asource"><option value="">Anywhere</option><option value="ui">Form</option><option value="bulk">Bulk upload</option><option value="portal">Portal</option></select></div>
+        <div><label for="aresult">Result</label>
+          <select id="aresult"><option value="">All</option><option value="ok">Sent</option><option value="failed">Failed</option></select></div>
+        <div><label for="afrom">From date</label><input id="afrom" type="date"></div>
+        <div><label for="ato">To date</label><input id="ato" type="date"></div>
+      </div>
+      <div class="row">
+        <button class="ghost" id="arefresh" type="button">Refresh</button>
+        <button class="ghost" id="acsv" type="button">Export CSV</button>
+        <span id="acount" class="muted"></span>
+      </div>
+      <div id="amsg" class="msg" role="status"></div>
+      <div class="scroll"><table id="atable"></table></div>
+      <div class="row"><button class="ghost" id="amore" type="button" hidden>Load more</button></div>
+    </div>
+  </section>
 </main>
 
 <dialog id="pv" aria-labelledby="pvTitle">
@@ -275,6 +308,11 @@
     <button class="primary" id="pvGo" type="button">Confirm and send</button>
     <button class="ghost" id="pvBack" type="button">Back to edit</button>
   </div>
+</dialog>
+
+<dialog id="tl" class="big" aria-labelledby="tlTitle">
+  <div class="ihead"><h3 id="tlTitle"></h3><button class="ghost" id="tlClose" type="button">Close</button></div>
+  <div id="tlBody"></div>
 </dialog>
 
 <script>
@@ -295,7 +333,8 @@ let project = 'Jira';
 async function api(path, opts = {}) {
   let res;
   try {
-    res = await fetch(path, { ...opts, headers: { ...(opts.headers || {}), 'X-UI-Passcode': $('passcode').value } });
+    res = await fetch(path, { ...opts, headers: { ...(opts.headers || {}), 'X-UI-Passcode': $('passcode').value,
+      'X-User-Name': encodeURIComponent($('who').value.trim()) } });
   } catch {
     throw new Error("Can't reach the server. Check that it is running.");
   }
@@ -315,33 +354,26 @@ function needPass(show) {
   return false;
 }
 
-// ---------- History (this browser) ----------
-function renderHistory() {
-  const h = store.get('jira.history', []);
-  if (!h.length) { $('hist').innerHTML = '<p class="empty">Nothing posted yet.</p>'; return; }
-  $('hist').innerHTML = '<div class="scroll" style="border:0;margin:0"><table><tr><th>When</th><th>Task</th><th>Jira</th><th>What happened</th></tr>' +
-    h.map(r => `<tr><td>${esc(r.at)}</td><td>${esc(r.taskId)}</td><td>${link(r.url, r.jiraKey)}</td><td>${esc(r.actions)}</td></tr>`).join('') +
-    '</table></div>';
-}
-function remember(taskId, out) {
-  const keys = store.get('jira.keys', {}); keys[taskId] = out.jiraKey; store.set('jira.keys', keys);
-  const h = store.get('jira.history', []);
-  h.unshift({ at: new Date().toLocaleString(), taskId, jiraKey: out.jiraKey, url: out.url, actions: out.actions.join(', ') });
-  store.set('jira.history', h.slice(0, 50));
-  renderHistory();
-}
+// ---------- Your name (goes with every send, for the history) ----------
+$('who').value = store.get('jira.name', '');
+$('who').addEventListener('change', () => store.set('jira.name', $('who').value.trim()));
+// The history now lives on the server (Activity tab); drop what older versions kept in this browser
+try { localStorage.removeItem('jira.history'); localStorage.removeItem('jira.keys'); } catch {}
+// After any send: the Activity tab, if open, shows it straight away
+function sent() { if (!$('activityPanel').hidden) loadActivity(); }
 
 // ---------- Tabs ----------
-const TABS = { single: ['tabSingle', 'singlePanel'], bulk: ['tabBulk', 'bulkPanel'], inbox: ['tabInbox', 'inboxPanel'] };
+const TABS = { single: ['tabSingle', 'singlePanel'], bulk: ['tabBulk', 'bulkPanel'], inbox: ['tabInbox', 'inboxPanel'], activity: ['tabActivity', 'activityPanel'] };
 function showTab(name) {
   if (!TABS[name]) name = 'single';
   for (const [k, [tab, panel]] of Object.entries(TABS)) {
     $(panel).hidden = k !== name;
     $(tab).setAttribute('aria-selected', String(k === name));
   }
-  document.querySelector('main').classList.toggle('wide', name === 'bulk');
+  document.querySelector('main').classList.toggle('wide', name === 'bulk' || name === 'activity');
   store.set('jira.tab', name);
   if (name === 'inbox') loadInbox();
+  if (name === 'activity') loadActivity();
 }
 for (const name of Object.keys(TABS)) $(TABS[name][0]).addEventListener('click', () => showTab(name));
 
@@ -545,12 +577,8 @@ async function pullFromJira() {
 setInterval(() => { if (loaded && document.visibilityState === 'visible') pullFromJira(); }, POLL_MS);
 document.addEventListener('visibilitychange', () => { if (loaded && document.visibilityState === 'visible') pullFromJira(); });
 
-// Remember the Jira key per task so the next post goes straight to the same issue
-$('taskId').addEventListener('change', () => {
-  const known = store.get('jira.keys', {})[$('taskId').value.trim()];
-  if (known && !$('jiraKey').value) $('jiraKey').value = known;
-  pullFromJira();
-});
+// The server remembers which ticket each Task ID belongs to, so the Task ID alone loads it
+$('taskId').addEventListener('change', pullFromJira);
 $('jiraKey').addEventListener('change', pullFromJira);
 
 $('clear').addEventListener('click', () => {
@@ -578,7 +606,8 @@ const noteList = (kind, title, items) => items.length
 
 function setBusy(on, text) { $('go').disabled = on; $('go').textContent = on ? text : 'Review and send'; }
 
-let pending = null; // checked task waiting for "Confirm and send"
+let pending = null;     // checked task waiting for "Confirm and send"
+let pendingFrom = '';   // 'activity' when the preview was opened by Retry there
 
 $('f').addEventListener('submit', async e => {
   e.preventDefault();
@@ -609,6 +638,7 @@ $('f').addEventListener('submit', async e => {
   setBusy(true, 'Checking…');
   try {
     pending = await api('ui/preview', postJson(data));
+    pendingFrom = '';
     openPreview(pending);
   } catch (err) {
     show('err', 'Failed: ' + esc(err.message));
@@ -641,10 +671,11 @@ $('pvBack').addEventListener('click', () => $('pv').close());
 $('pvGo').addEventListener('click', async () => {
   $('pv').close();
   const task = pending.task;
+  if (pendingFrom === 'activity') return retrySend(task);
   setBusy(true, 'Sending…');
   try {
     const out = await api('ui/task', postJson(task));
-    remember(task.taskId, out);
+    sent();
     $('jiraKey').value = out.jiraKey;
     $('comment').value = ''; $('hoursSpent').value = '';
     loaded = null; pullFromJira(); // reload everything from Jira, including what was just sent
@@ -796,7 +827,7 @@ $('bgo').addEventListener('click', async () => {
       r.result = { ok: true, ...out };
       r.done = true;
       out.actions.includes('created') ? created++ : updated++;
-      remember(r.task.taskId, out);
+      sent();
     } catch (err) {
       r.result = { ok: false, error: err.message };
       failed++;
@@ -826,18 +857,11 @@ $('tmpl').addEventListener('click', e => {
     ['T-2001', '', 'Example: configure outage SMS template (delete this row)', 'Set up the SMS text sent during outages.',
       'name@company.com', '', '2026-10-20', '2026-10-24', '1d 4h', '', 'sms, outage', '', 'Medium', 'To Do'],
   ];
-  const csv = rows.map(r => r.map(v => /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v).join(',')).join('\r\n') + '\r\n';
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' })); // BOM so Excel reads UTF-8
-  a.download = 'jira-bulk-template.csv';
-  document.body.append(a); a.click(); a.remove();
-  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  downloadCsv('jira-bulk-template.csv', rows);
 });
 
 // ---------- Inbox: changes waiting for approval before they reach Jira ----------
 let inbox = { pending: [], decided: [], approvalMode: false };
-$('iby').value = store.get('jira.name', '');
-$('iby').addEventListener('change', () => store.set('jira.name', $('iby').value.trim()));
 function ishow(kind, html) { const m = $('imsg'); m.className = 'msg ' + kind; m.innerHTML = html; }
 const when = iso => iso ? new Date(iso).toLocaleString() : '';
 const SOURCES = { portal: 'the portal', sheet: 'the Google Sheet' };
@@ -899,9 +923,9 @@ $('ilist').addEventListener('click', async e => {
   card.querySelectorAll('button').forEach(b => { b.disabled = true; });
   say('info', btn.dataset.act === 'approve' ? 'Checking again and sending to Jira…' : 'Rejecting…');
   try {
-    const item = await api(`ui/inbox/${encodeURIComponent(id)}/${btn.dataset.act}`, postJson({ by: $('iby').value.trim(), reason }));
+    const item = await api(`ui/inbox/${encodeURIComponent(id)}/${btn.dataset.act}`, postJson({ reason }));
     if (item.status === 'approved') {
-      remember(item.task.taskId, item.result);
+      sent();
       say('ok', `Sent: ${link(item.result.url, item.result.jiraKey)} (${esc(item.result.actions.join(', ') || 'no changes')})` +
         (item.result.warning ? `<br>Note: ${esc(item.result.warning)}` : ''));
     } else say('ok', 'Rejected. Nothing was sent to Jira.');
@@ -916,10 +940,153 @@ $('irefresh').addEventListener('click', loadInbox);
 // Keep the badge current while the page is open
 setInterval(() => { if (document.visibilityState === 'visible') loadInbox(); }, 30000);
 
+// ---------- Activity: everything sent to Jira, for everyone (kept on the server) ----------
+let acts = { items: [], next: '', more: false };
+const SOURCE_NAMES = { ui: 'Form', bulk: 'Bulk upload', portal: 'Portal', sheet: 'Google Sheet' };
+const FIELD_NAMES = { ...LABELS, assignee: 'Assignee', hoursSpent: 'Work logged' };
+function ashow(kind, html) { const m = $('amsg'); m.className = 'msg ' + kind; m.innerHTML = html; }
+const sourceText = e => (SOURCE_NAMES[e.source] || e.source) + (e.via === 'inbox' ? ' (approved in Inbox)' : '');
+
+function actionText(a) {
+  if (a === 'created') return 'Created';
+  if (a === 'updated') return 'Updated';
+  if (a === 'commented') return 'Comment added';
+  if (a.startsWith('transitioned:')) return 'Status → ' + a.slice(13);
+  if (a.startsWith('worklog:')) return 'Logged ' + a.slice(8);
+  return a;
+}
+const happened = e => e.ok
+  ? (e.actions.map(actionText).join(' · ') || 'No changes') + (e.changes?.length ? ` · changed: ${e.changes.map(c => FIELD_NAMES[c.field] || c.field).join(', ')}` : '')
+  : (e.refused ? '' : 'Failed: ') + (e.error || '');
+
+// Date boxes are local days; the server gets them as times (end day is included)
+const dayMs = (v, nextDay) => v ? new Date(v + 'T00:00:00').getTime() + (nextDay ? 86400000 : 0) : '';
+function activityParams(extra = {}) {
+  const p = { q: $('aq').value.trim(), source: $('asource').value, result: $('aresult').value,
+    from: dayMs($('afrom').value), to: dayMs($('ato').value, true), ...extra };
+  return new URLSearchParams(Object.entries(p).filter(([, v]) => v !== '' && v != null));
+}
+
+async function loadActivity(more = false) {
+  if (!$('passcode').value) return;
+  try {
+    const out = await api('ui/activity?' + activityParams(more ? { before: acts.next } : {}));
+    acts = more ? { ...out, items: [...acts.items, ...out.items] } : out;
+    renderActivity();
+    if ($('amsg').classList.contains('err')) $('amsg').className = 'msg';
+  } catch (err) {
+    ashow('err', 'History not loaded: ' + esc(err.message));
+  }
+}
+
+function renderActivity() {
+  const rows = acts.items;
+  $('acount').textContent = rows.length ? `${rows.length}${acts.more ? '+' : ''} shown` : '';
+  $('amore').hidden = !acts.more;
+  $('atable').innerHTML = !rows.length ? '<tr><td class="empty">Nothing matches.</td></tr>' :
+    '<thead><tr><th>When</th><th>From</th><th>By</th><th>Task</th><th>Jira</th><th>What happened</th><th></th></tr></thead><tbody>' +
+    rows.map((e, i) => `<tr class="hit${e.ok ? '' : ' failed'}" data-i="${i}">` +
+      `<td>${esc(when(e.at))}</td><td>${esc(sourceText(e))}</td><td>${esc(e.by || '')}</td>` +
+      `<td>${esc(e.taskId)}${e.title ? `<div class="muted">${esc(e.title.length > 60 ? e.title.slice(0, 60) + '…' : e.title)}</div>` : ''}</td>` +
+      `<td>${e.jiraKey ? (e.url ? link(e.url, e.jiraKey) : esc(e.jiraKey)) : ''}</td>` +
+      `<td class="wrap ${e.ok ? '' : 'errt'}">${esc(happened(e))}${e.warning ? `<div class="warnt">${esc(e.warning)}</div>` : ''}</td>` +
+      `<td>${!e.ok && !e.refused && e.task ? '<button class="ghost" type="button" data-retry>Retry</button>' : ''}</td></tr>`).join('') + '</tbody>';
+}
+
+$('atable').addEventListener('click', e => {
+  const tr = e.target.closest('tr[data-i]');
+  if (!tr || e.target.closest('a')) return;
+  const entry = acts.items[+tr.dataset.i];
+  if (e.target.closest('button[data-retry]')) retry(entry); else openTimeline(entry);
+});
+
+let aTimer = null;
+$('aq').addEventListener('input', () => { clearTimeout(aTimer); aTimer = setTimeout(() => loadActivity(), 350); });
+for (const id of ['asource', 'aresult', 'afrom', 'ato']) $(id).addEventListener('change', () => loadActivity());
+$('arefresh').addEventListener('click', () => loadActivity());
+$('amore').addEventListener('click', () => loadActivity(true));
+
+// ---------- One task's full history ----------
+function changeTable(changes) {
+  if (!changes?.length) return '';
+  const cell = v => `<td><div>${esc(v)}</div></td>`;
+  return '<table class="chg"><tr><th>Field</th><th>Before</th><th>After</th></tr>' + changes.map(c =>
+    `<tr><td>${esc(FIELD_NAMES[c.field] || c.field)}</td>` +
+    (c.before === '?' ? '<td class="muted">unknown</td>' : cell(c.before)) +
+    (c.after === '' && c.before ? '<td class="removed">removed</td>' : cell(c.after)) + '</tr>').join('') + '</table>';
+}
+
+async function openTimeline(entry) {
+  $('tlTitle').innerHTML = `Task ${esc(entry.taskId)}` + (entry.url ? ` · ${link(entry.url, entry.jiraKey)}` : entry.jiraKey ? ` · ${esc(entry.jiraKey)}` : '');
+  $('tlBody').innerHTML = '<p class="muted">Loading…</p>';
+  $('tl').showModal();
+  try {
+    const q = new URLSearchParams({ taskId: entry.taskId, ...(entry.jiraKey && { jiraKey: entry.jiraKey }) });
+    const { items } = await api('ui/activity/task?' + q);
+    $('tlBody').innerHTML = !items.length ? '<p class="empty">No history.</p>' : items.map(e =>
+      `<div class="item"><b>${esc(when(e.at))}</b> <span class="muted">· ${esc(sourceText(e))}${e.by ? ' · ' + esc(e.by) : ''}</span>` +
+      `<div class="${e.ok ? '' : 'errt'}" style="margin-top:4px">${esc(happened(e).replace(/ · changed: .*$/, ''))}</div>` +
+      (e.warning ? `<div class="warnt">${esc(e.warning)}</div>` : '') + changeTable(e.changes) + '</div>').join('');
+  } catch (err) {
+    $('tlBody').innerHTML = `<p class="errt">${esc(err.message)}</p>`;
+  }
+}
+$('tlClose').addEventListener('click', () => $('tl').close());
+
+// ---------- Retry a failed send: the normal preview first, then send ----------
+async function retry(entry) {
+  if (!needPass(ashow)) return;
+  ashow('info', `Checking task ${esc(entry.taskId)} against Jira again…`);
+  try {
+    pending = await api('ui/preview', postJson(entry.task));
+    pendingFrom = 'activity';
+    $('amsg').className = 'msg';
+    openPreview(pending);
+  } catch (err) {
+    ashow('err', 'Could not check it: ' + esc(err.message));
+  }
+}
+async function retrySend(task) {
+  pendingFrom = '';
+  ashow('info', 'Sending…');
+  try {
+    const out = await api('ui/task', postJson(task));
+    ashow('ok', `Sent: ${link(out.url, out.jiraKey)} (${esc(out.actions.map(actionText).join(', ') || 'no changes')})` + (out.warning ? `<br>Note: ${esc(out.warning)}` : ''));
+  } catch (err) {
+    ashow('err', 'Failed again: ' + esc(err.message));
+  }
+  loadActivity();
+}
+
+// ---------- CSV of what the filters show (up to 500 rows) ----------
+function downloadCsv(name, rows) {
+  const csv = rows.map(r => r.map(v => { v = String(v ?? ''); return /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v; }).join(',')).join('\r\n') + '\r\n';
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' })); // BOM so Excel reads UTF-8
+  a.download = name;
+  document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+$('acsv').addEventListener('click', async () => {
+  if (!needPass(ashow)) return;
+  try {
+    const { items, more } = await api('ui/activity?' + activityParams({ limit: 500 }));
+    downloadCsv(`jira-activity-${new Date().toISOString().slice(0, 10)}.csv`, [
+      ['When', 'From', 'By', 'Task ID', 'Jira key', 'Title', 'Result', 'What happened', 'Changes', 'Error'],
+      ...items.map(e => [e.at, sourceText(e), e.by, e.taskId, e.jiraKey, e.title, e.ok ? 'Sent' : e.refused ? 'Refused' : 'Failed',
+        e.ok ? e.actions.map(actionText).join('; ') : '',
+        (e.changes || []).map(c => `${FIELD_NAMES[c.field] || c.field}: ${c.before || '(empty)'} -> ${c.after || '(empty)'}`).join('; '),
+        e.error || '']),
+    ]);
+    ashow('ok', `Exported ${items.length} row${items.length === 1 ? '' : 's'}.` + (more ? ' Only the newest 500 are included; narrow the filters to export the rest.' : ''));
+  } catch (err) {
+    ashow('err', 'Export failed: ' + esc(err.message));
+  }
+});
+
 $('passcode').addEventListener('change', () => { store.set('jira.passcode', $('passcode').value); loadOptions(); pullFromJira(); loadInbox(); });
 
 showTab(store.get('jira.tab', 'single'));
-renderHistory();
 loadOptions();
 loadInbox();
 </script>
