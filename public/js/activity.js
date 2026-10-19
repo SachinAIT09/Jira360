@@ -28,7 +28,7 @@ function activityParams(extra = {}) {
 }
 
 async function loadActivity(more = false) {
-  if (!$('passcode').value) return;
+  if (!passOk()) return;
   try {
     const out = await api('ui/activity?' + activityParams(more ? { before: acts.next } : {}));
     acts = more ? { ...out, items: [...acts.items, ...out.items] } : out;
@@ -44,7 +44,7 @@ function renderActivity() {
   $('acount').textContent = rows.length ? `${rows.length}${acts.more ? '+' : ''} shown` : '';
   $('amore').hidden = !acts.more;
   $('atable').innerHTML = !rows.length ? '<tr><td class="empty">Nothing matches.</td></tr>' :
-    '<thead><tr><th>When</th><th>From</th><th>By</th><th>Task</th><th>Jira</th><th>What happened</th><th></th></tr></thead><tbody>' +
+    '<thead><tr><th>When</th><th>From</th><th>By</th><th>Task</th><th>Jira</th><th>What happened</th><th><span class="sr-only">Actions</span></th></tr></thead><tbody>' +
     rows.map((e, i) => `<tr class="hit${e.ok ? '' : ' failed'}" data-i="${i}">` +
       `<td>${esc(when(e.at))}</td><td>${esc(sourceText(e))}</td><td>${esc(e.by || '')}</td>` +
       `<td>${esc(e.taskId)}${e.title ? `<div class="muted">${esc(e.title.length > 60 ? e.title.slice(0, 60) + '…' : e.title)}</div>` : ''}</td>` +

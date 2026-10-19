@@ -195,7 +195,7 @@ function renderBulk() {
   const allOn = eligible.length && eligible.every(([r]) => r.selected);
   $('btable').innerHTML =
     `<thead><tr><th><input type="checkbox" id="ball" aria-label="Tick all ready rows shown" ${allOn ? 'checked' : ''} ${running || !eligible.length ? 'disabled' : ''}></th>` +
-    '<th>Row</th><th>Will</th><th>Checks / result</th>' + BCOLS.map(c => `<th>${c[1]}</th>`).join('') + '<th></th></tr></thead><tbody>' +
+    '<th>Row</th><th>Will</th><th>Checks / result</th>' + BCOLS.map(c => `<th>${c[1]}</th>`).join('') + '<th><span class="sr-only">Actions</span></th></tr></thead><tbody>' +
     (shown.length ? '' : `<tr><td colspan="${BCOLS.length + 5}" class="empty">No rows here.</td></tr>`) +
     shown.map(([r, i]) => {
       if (r.editing) return editRow(r, i);

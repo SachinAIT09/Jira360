@@ -1,0 +1,415 @@
+/*
+  Jira360 design system (Tailwind CSS v4). Build: npm run build:css  ->  public/app.css
+  Edit this file, never public/app.css (it is generated).
+
+  Layers:
+  1. Tokens      semantic CSS variables for light and dark, exposed to Tailwind through @theme
+  2. Base        element defaults (type, form controls, focus, dialogs, tables)
+  3. Components  the shared patterns that the page scripts generate (buttons, alerts, cards, tags)
+  Page layout uses Tailwind utilities directly in public/index.html.
+*/
+@import "tailwindcss";
+@source "../public";
+
+/* Dark mode follows data-theme on <html> (set before first paint from the saved choice or the system) */
+@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
+
+/* ---------- 1. Tokens ---------- */
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("fonts/inter-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("fonts/inter-latin-ext.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+:root {
+  color-scheme: light;
+  --bg: #f6f7f9;            /* page */
+  --surface: #ffffff;       /* cards, dialogs */
+  --surface-2: #f2f4f7;     /* subtle fills: table heads, nested panels */
+  --surface-3: #e9edf2;     /* hover on subtle fills */
+  --field: #ffffff;         /* inputs */
+  --text: #101828;
+  --text-2: #344054;        /* secondary text */
+  --muted: #5b6578;         /* helper text: 5.5:1 on --bg */
+  --border: #e3e7ed;
+  --border-strong: #cdd3dc;
+  --accent: #2f5bea;
+  --accent-hover: #2349c9;
+  --accent-fg: #ffffff;     /* text on --accent */
+  --accent-soft: #eef2ff;
+  --accent-text: #2442b8;   /* accent-coloured text / links */
+  --ring: rgb(47 91 234 / .35);
+  --ok: #067647;   --ok-bg: #ecfdf3;   --ok-border: #abefc6;
+  --warn: #93370d; --warn-bg: #fffaeb; --warn-border: #fedf89;
+  --err: #b42318;  --err-bg: #fef3f2;  --err-border: #fecdca;
+  --overlay: rgb(16 24 40 / .5);
+  --shadow-sm: 0 1px 2px rgb(16 24 40 / .05);
+  --shadow-md: 0 4px 12px -2px rgb(16 24 40 / .08), 0 2px 4px -2px rgb(16 24 40 / .04);
+  --shadow-lg: 0 24px 48px -12px rgb(16 24 40 / .22);
+  --select-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%235b6578' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m4 6 4 4 4-4'/%3E%3C/svg%3E");
+}
+[data-theme=dark] {
+  color-scheme: dark;
+  --bg: #0b0f17;
+  --surface: #121826;
+  --surface-2: #182033;
+  --surface-3: #212b41;
+  --field: #0e1420;
+  --text: #e8ecf3;
+  --text-2: #c2cad8;
+  --muted: #98a3b6;         /* 6.9:1 on --surface */
+  --border: #232d42;
+  --border-strong: #34415c;
+  --accent: #7b98ff;
+  --accent-hover: #9bb1ff;
+  --accent-fg: #0b1020;
+  --accent-soft: #1b2545;
+  --accent-text: #a8bbff;
+  --ring: rgb(123 152 255 / .4);
+  --ok: #6ee7a8;   --ok-bg: #0e2a1f;   --ok-border: #1d4d37;
+  --warn: #f7c568; --warn-bg: #2b2111; --warn-border: #5a4419;
+  --err: #ff9b91;  --err-bg: #2f1517;  --err-border: #5c2629;
+  --overlay: rgb(2 6 14 / .7);
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / .4);
+  --shadow-md: 0 4px 14px -2px rgb(0 0 0 / .45);
+  --shadow-lg: 0 24px 56px -12px rgb(0 0 0 / .7);
+  --select-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%2398a3b6' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m4 6 4 4 4-4'/%3E%3C/svg%3E");
+}
+
+/* The same tokens as Tailwind utilities: bg-surface, text-muted, border-border, ... */
+@theme inline {
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", Consolas, monospace;
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-field: var(--field);
+  --color-fg: var(--text);
+  --color-fg-2: var(--text-2);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-fg: var(--accent-fg);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-text: var(--accent-text);
+  --color-ok: var(--ok);
+  --color-ok-bg: var(--ok-bg);
+  --color-warn: var(--warn);
+  --color-warn-bg: var(--warn-bg);
+  --color-err: var(--err);
+  --color-err-bg: var(--err-bg);
+  --shadow-xs: var(--shadow-sm);
+  --shadow-card: var(--shadow-md);
+  --shadow-pop: var(--shadow-lg);
+}
+/* Type scale (UI-dense product: 14px body, 13px secondary, 12px meta) and shapes */
+@theme {
+  --text-2xs: 0.6875rem; --text-2xs--line-height: 1rem;
+  --text-xs: 0.75rem;    --text-xs--line-height: 1.125rem;
+  --text-sm: 0.8125rem;  --text-sm--line-height: 1.25rem;
+  --text-base: 0.875rem; --text-base--line-height: 1.375rem;
+  --text-md: 0.9375rem;  --text-md--line-height: 1.5rem;
+  --text-lg: 1.0625rem;  --text-lg--line-height: 1.5rem;
+  --text-xl: 1.25rem;    --text-xl--line-height: 1.75rem;
+  --text-2xl: 1.5rem;    --text-2xl--line-height: 2rem;
+  --radius-sm: 6px; --radius-md: 8px; --radius-lg: 12px; --radius-xl: 16px;
+  --ease-out: cubic-bezier(.2, .8, .2, 1);
+}
+
+/* ---------- 2. Base ---------- */
+@layer base {
+  [hidden] { display: none !important; } /* "hidden" wins over any display utility */
+  html { -webkit-text-size-adjust: 100%; text-rendering: optimizeLegibility; }
+  body {
+    @apply bg-bg font-sans text-base text-fg antialiased;
+    font-feature-settings: "cv11", "ss01"; /* Inter: single-storey a, open digits */
+  }
+  h1, h2, h3, h4 { @apply text-fg; letter-spacing: -0.011em; }
+  a { @apply text-accent-text underline-offset-2 hover:underline; }
+  b, strong { @apply font-semibold; }
+  ::selection { background: var(--accent-soft); color: var(--text); }
+
+  /* Focus: one visible ring everywhere, keyboard only */
+  :focus { outline: none; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-sm); }
+
+  label { @apply mb-1.5 block text-sm font-medium text-fg-2; }
+
+  input:not([type=checkbox]):not([type=radio]):not([type=file]), select, textarea {
+    @apply block w-full rounded-md border border-border-strong bg-field px-3 text-base text-fg shadow-xs;
+    min-height: 2.375rem;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  input::placeholder, textarea::placeholder { color: var(--muted); opacity: .85; }
+  input:not([type=checkbox]):not([type=radio]):hover, select:hover, textarea:hover { border-color: color-mix(in srgb, var(--border-strong) 60%, var(--muted)); }
+  input:not([type=checkbox]):not([type=radio]):focus, select:focus, textarea:focus,
+  input:not([type=checkbox]):not([type=radio]):focus-visible, select:focus-visible, textarea:focus-visible {
+    border-color: var(--accent); box-shadow: 0 0 0 3px var(--ring); outline: none;
+  }
+  input:disabled, select:disabled, textarea:disabled { @apply cursor-not-allowed opacity-60; }
+  textarea { @apply py-2; min-height: 6rem; resize: vertical; }
+  select:not([multiple]) {
+    @apply appearance-none pr-9;
+    background-image: var(--select-arrow); background-repeat: no-repeat; background-position: right .65rem center;
+  }
+  select[multiple] { @apply py-1; }
+  input[type=date], input[type=datetime-local] { @apply pr-2; }
+  input[type=checkbox], input[type=radio] { @apply size-4 shrink-0 cursor-pointer; accent-color: var(--accent); }
+  /* Phones: 16px text in fields so iOS doesn't zoom in on focus */
+  @media (max-width: 639px) { input:not([type=checkbox]):not([type=radio]), select, textarea { font-size: 1rem; } }
+
+  button { @apply cursor-pointer font-medium; font: inherit; }
+  button:disabled { @apply cursor-not-allowed opacity-50; }
+
+  table { @apply w-full border-collapse text-base; }
+  th, td { @apply border-b border-border px-3 py-2.5 text-left align-top; }
+  th { @apply bg-surface-2 text-xs font-semibold tracking-wide text-muted uppercase; }
+  tbody tr:last-child td { border-bottom: 0; }
+  td a { @apply font-medium; }
+
+  dialog {
+    @apply m-auto rounded-xl border border-border bg-surface p-0 text-fg shadow-pop;
+    width: min(36rem, calc(100% - 2rem));
+    max-height: calc(100dvh - 2rem);
+  }
+  dialog[open] { animation: dialog-in .16s var(--ease-out); }
+  dialog::backdrop { background: var(--overlay); animation: fade-in .16s ease-out; }
+  dialog > * { margin-left: 1.5rem; margin-right: 1.5rem; }
+  dialog > :first-child { margin-top: 1.375rem; }
+  dialog > :last-child { margin-bottom: 1.375rem; }
+  dialog h2 { @apply mb-1 text-xl font-semibold; }
+
+  progress { @apply mt-2 h-1.5 w-full overflow-hidden rounded-full; accent-color: var(--accent); }
+  details > summary { @apply cursor-pointer; }
+  kbd { @apply rounded border border-b-2 border-border-strong bg-surface-2 px-1.5 py-0.5 font-mono text-2xs text-fg-2; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+  }
+}
+@keyframes dialog-in { from { opacity: 0; transform: translateY(6px) scale(.985); } }
+@keyframes fade-in { from { opacity: 0; } }
+
+/* ---------- 3. Components (used by the page and generated by its scripts) ---------- */
+@layer components {
+  /* Surfaces */
+  .card { @apply rounded-lg border border-border bg-surface p-5 shadow-xs sm:p-6; }
+  .item { @apply mt-4 rounded-lg border border-border bg-surface-2/60 p-4 sm:p-5; }
+  .item.gone { @apply opacity-50 transition-opacity; }
+  .scroll { @apply relative mt-3 overflow-x-auto rounded-lg border border-border bg-surface; } /* relative: keeps sr-only text inside, so it cannot widen the page */
+  .scroll.bare { @apply mt-0 border-0; }
+
+  /* Page frame */
+  .app-main { @apply mx-auto w-full max-w-[56rem] px-4 pt-7 pb-20 outline-none sm:px-6 sm:pt-9; }
+  .app-main.wide { @apply max-w-[80rem]; }
+  .pagehead { @apply mb-5; }
+  .pagehead h1 { @apply m-0 text-2xl font-semibold; }
+  .pagehead p { @apply mt-1 mb-0 max-w-[72ch] text-base text-fg-2; }
+  .pagehead--actions { @apply flex flex-wrap items-end justify-between gap-x-4 gap-y-3; }
+  .formfoot { @apply mt-7 flex flex-wrap items-center gap-2.5 border-t border-border pt-5; }
+  .dlgfoot {
+    @apply sticky bottom-0 z-10 flex flex-wrap items-center gap-2.5 border-t border-border bg-surface;
+    margin: 1.25rem 0 0 !important; padding: .875rem 1.5rem 1rem;
+  }
+  dialog.full .dlgfoot { @apply static; }
+
+  /* Theme switch in the header */
+  .themebtn {
+    @apply inline-flex size-8 items-center justify-center rounded-[5px] border-0 bg-transparent text-muted;
+    transition: background-color .15s, color .15s;
+  }
+  .themebtn svg { @apply size-4 fill-none stroke-current; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .themebtn:hover { @apply text-fg; }
+  .themebtn[aria-pressed=true] { @apply bg-surface text-fg shadow-xs; }
+
+  /* Layout helpers kept for the scripts */
+  .grid { @apply grid grid-cols-1 gap-x-5 gap-y-4 sm:grid-cols-2; }
+  .grid > * { min-width: 0; }
+  .full { grid-column: 1 / -1; }
+  .row { @apply mt-5 flex flex-wrap items-center gap-2.5; }
+  .row.tight { @apply mt-0 gap-2; }
+  .ihead { @apply flex flex-wrap items-start justify-between gap-3; }
+  .keys { @apply ml-auto hidden text-xs text-muted sm:inline; }
+
+  /* Buttons: .primary (main action), .ghost (secondary), .linkbtn (inline), .danger */
+  .primary, .ghost, .danger {
+    @apply inline-flex items-center justify-center gap-2 rounded-md px-4 text-base font-medium whitespace-nowrap select-none;
+    min-height: 2.375rem;
+    transition: background-color .15s, border-color .15s, color .15s, box-shadow .15s, transform .05s;
+  }
+  .primary:active:not(:disabled), .ghost:active:not(:disabled), .danger:active:not(:disabled) { transform: translateY(1px); }
+  .primary { @apply bg-accent text-accent-fg shadow-xs; }
+  .primary:hover:not(:disabled) { @apply bg-accent-hover; }
+  .ghost { @apply border border-border-strong bg-surface text-fg-2 shadow-xs; }
+  .ghost:hover:not(:disabled) { @apply bg-surface-2 text-fg; }
+  .danger { @apply border border-err/40 bg-err-bg text-err; }
+  .row.tight .primary, .row.tight .ghost, td .ghost, td .primary, .aifix .ghost, .fctable .ghost {
+    @apply px-3 text-sm; min-height: 2rem;
+  }
+  .linkbtn {
+    @apply ml-2 inline-flex min-h-6 items-center rounded-sm border-0 bg-transparent px-0.5 py-0 text-sm font-medium tracking-normal text-accent-text normal-case; /* 24px: WCAG 2.2 target size */
+  }
+  .linkbtn:hover { @apply underline; }
+
+  /* Text */
+  .opt { @apply font-normal text-muted; }
+  .muted { @apply text-sm text-muted; }
+  .hint { @apply m-0 max-w-[72ch] text-base text-fg-2; }
+  .hint a { @apply font-medium; }
+  .fieldnote { @apply mt-1.5 mb-0 min-h-[1em] text-sm [overflow-wrap:anywhere] text-muted; }
+  .sync { @apply -mt-1 mb-0 text-sm text-muted; }
+  .sync:empty, .fieldnote:empty { display: none; } /* no empty gaps; they appear when there is something to say */
+  .sync b { @apply text-fg; }
+  .empty { @apply py-6 text-center text-base text-muted; }
+  .good { @apply text-ok; }
+  .errt { @apply text-err; }
+  .warnt { @apply text-warn; }
+  .section {
+    @apply mt-3 mb-0 flex flex-wrap items-center gap-x-1 gap-y-1 border-t border-border pt-5 text-xs font-semibold tracking-wider text-muted uppercase;
+  }
+  .section .opt { @apply text-xs tracking-normal normal-case; }
+  .section .linkbtn { @apply text-sm; }
+  .section .linkbtn:first-of-type { @apply ml-auto; }
+
+  /* Alerts: .msg (hidden until it has a kind) and .note */
+  .msg { @apply mt-4 hidden rounded-lg border px-4 py-3 text-base; }
+  .msg.ok, .msg.err, .msg.info { @apply block; }
+  .msg.ok, .note.ok { @apply border-[var(--ok-border)] bg-ok-bg text-ok; }
+  .msg.err, .note.err { @apply border-[var(--err-border)] bg-err-bg text-err; }
+  .msg.info { @apply border-border bg-surface-2 text-fg-2; }
+  .msg a, .note a { @apply font-semibold text-inherit underline; }
+  .msg ul, .note ul { @apply mt-1 mb-0 list-disc pl-5; }
+  .note { @apply mt-4 rounded-lg border px-4 py-3 text-base; }
+  .note.warn { @apply border-[var(--warn-border)] bg-warn-bg text-warn; }
+
+  /* Tags and counters */
+  .badge {
+    @apply ml-1.5 inline-flex min-w-5 items-center justify-center rounded-full bg-accent px-1.5 text-2xs font-semibold text-accent-fg;
+    height: 1.25rem;
+  }
+  .chips {
+    @apply flex min-h-[2.375rem] cursor-text flex-wrap items-center gap-1.5 rounded-md border border-border-strong bg-field px-1.5 py-1 shadow-xs;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .chips:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--ring); }
+  .chips input:not([type=checkbox]) { @apply min-h-0 w-auto min-w-30 flex-1 border-0 bg-transparent px-1.5 py-1 shadow-none; }
+  .chips input:focus { box-shadow: none; }
+  .chip { @apply inline-flex max-w-full items-center gap-0.5 rounded-md border border-border bg-surface-2 py-0.5 pr-0.5 pl-2 text-sm text-fg; }
+  .chip span { @apply truncate; }
+  .chip button { @apply rounded-sm bg-transparent px-1.5 text-base leading-5 text-muted hover:bg-surface-3 hover:text-err; }
+  .srctag { @apply ml-1.5 inline-flex shrink-0 items-center rounded-full whitespace-nowrap border border-border bg-surface-2 px-2 text-2xs font-medium text-muted; line-height: 1.125rem; }
+
+  /* Tabs: the main navigation and the row filters in the bulk review */
+  .tabs { @apply flex gap-1 overflow-x-auto overflow-y-hidden border-b border-border; scrollbar-width: none; } /* swipe / shift+wheel to scroll */
+  .tabs::-webkit-scrollbar { display: none; }
+  .tabs [role=tab] {
+    @apply -mb-px inline-flex items-center gap-2 border-b-2 border-transparent bg-transparent px-3 py-2.5 text-base font-medium whitespace-nowrap text-muted;
+    transition: color .15s, border-color .15s;
+  }
+  .tabs [role=tab]:hover { @apply text-fg; }
+  .tabs [role=tab][aria-selected=true] { @apply border-accent text-fg; }
+  .tabs [role=tab] svg { @apply size-4 shrink-0 opacity-80; }
+  .tabs .count { @apply ml-0.5 rounded-full bg-surface-2 px-1.5 text-xs font-medium text-muted; }
+  .tabs [aria-selected=true] .count { @apply bg-accent-soft text-accent-text; }
+
+  /* Key / value lists (review dialog, inbox cards) */
+  dl.kv { @apply mt-3 mb-0 grid grid-cols-1 gap-x-4 gap-y-1 sm:grid-cols-[10rem_1fr] sm:gap-y-2.5; }
+  dl.kv dt { @apply text-sm text-muted; }
+  dl.kv dd { @apply m-0 mb-2 [overflow-wrap:anywhere] whitespace-pre-wrap sm:mb-0; }
+  dl.kv dd.remove, dl.kv dd .remove { @apply text-err; }
+  .was { @apply text-muted line-through decoration-muted/60; }
+  .new { @apply font-semibold; }
+  .same { @apply text-muted; }
+  dl.kv dd .long { @apply block max-h-36 overflow-auto rounded-md border border-border bg-surface-2 px-3 py-2 font-normal; }
+  dl.kv dd .long + .long { @apply mt-1.5; }
+  dl.kv dd .was.long, dl.kv dd .was .long { @apply no-underline; }
+  .pvsec { @apply mt-5 mb-0 text-xs font-semibold tracking-wider text-muted uppercase; }
+  .pvsec + dl.kv { @apply mt-2; }
+
+  /* Dialog sizes */
+  dialog.big { width: min(56rem, calc(100% - 2rem)); }
+  dialog.full { @apply flex-col; width: calc(100% - 2rem); max-width: 90rem; height: calc(100dvh - 2rem); max-height: none; }
+  dialog.full[open] { @apply flex; }
+  dialog.full .bscroll { @apply min-h-0 flex-1 overflow-auto; }
+  dialog.full .tabs { @apply mt-3 mb-3; }
+  .bsummary { @apply mt-1 mb-0 text-sm text-fg-2; }
+
+  /* Bulk review table */
+  #btable th, #btable td { @apply whitespace-nowrap; }
+  #btable td.wrap { @apply max-w-[22rem] min-w-[14rem] whitespace-normal; }
+  #btable thead th { @apply sticky top-0 z-10; }
+  #btable tr.bad td { background: color-mix(in srgb, var(--err-bg) 70%, transparent); }
+  #btable tr.editing td { @apply bg-surface-2 whitespace-normal; }
+  .checks div + div { @apply mt-1; }
+  .editgrid { @apply grid grid-cols-[repeat(auto-fill,minmax(12rem,1fr))] gap-x-3 gap-y-2.5 py-2; }
+  .editgrid .full { grid-column: 1 / -1; }
+  .editgrid label { @apply mb-1 text-xs; }
+
+  /* Activity table */
+  #atable tr.hit { @apply cursor-pointer; }
+  #atable tr.hit:hover td { @apply bg-surface-2; }
+  #atable tr.failed td { background: color-mix(in srgb, var(--err-bg) 70%, transparent); }
+  #atable td.wrap { @apply max-w-[24rem] min-w-[14rem]; }
+  #atable td:nth-child(1), #atable td:nth-child(5) { @apply whitespace-nowrap; } /* when, Jira key */
+  table.chg { @apply mt-3 overflow-hidden rounded-md border border-border text-sm; }
+  table.chg td { @apply max-w-80 [overflow-wrap:anywhere] whitespace-pre-wrap; }
+  table.chg td div { @apply max-h-40 overflow-auto; }
+  td.removed { @apply text-err; }
+
+  /* Single ticket: Jira's latest comments and work logs */
+  .recent { @apply rounded-lg border border-border bg-surface-2/60 px-4 py-2.5; }
+  .recent summary { @apply text-sm font-medium text-fg-2; }
+  .recent .ritem { @apply mt-2.5 text-sm; }
+  .recent .ritem p { @apply mt-0.5 mb-0 [overflow-wrap:anywhere] whitespace-pre-wrap text-fg-2; }
+  .recent h3 { @apply mt-3 mb-0 text-2xs font-semibold tracking-wider text-muted uppercase; }
+
+  /* Bulk upload drop zone */
+  .drop {
+    @apply relative mt-4 mb-0 block cursor-pointer rounded-lg border-2 border-dashed border-border-strong bg-surface-2/50 px-4 py-10 text-center text-base font-normal text-fg-2;
+    transition: border-color .15s, background-color .15s;
+  }
+  .drop:hover, .drop.over, .drop:focus-within { @apply border-accent bg-accent-soft/60; }
+  .drop input { @apply absolute inset-0 cursor-pointer opacity-0; }
+
+  /* AI */
+  body:not(.ai-on) .ai-only { display: none !important; }
+  table.sugg { @apply mt-3; }
+  table.sugg td { @apply align-top [overflow-wrap:anywhere] whitespace-pre-wrap; }
+  table.sugg td.val { @apply max-w-[26rem]; }
+  table.sugg td.val div { @apply max-h-44 overflow-auto; }
+  .aifix { @apply mt-1.5 rounded-md border border-dashed border-accent/60 bg-accent-soft/60 px-2.5 py-1.5 whitespace-normal; }
+  .aifix button { @apply ml-1.5; }
+  #aiText { min-height: 11rem; }
+
+  /* Inbox: conflicts */
+  .conflict { @apply mt-2 flex flex-wrap items-baseline gap-x-4 gap-y-1; }
+  .conflict label { @apply m-0 inline-flex items-baseline gap-1.5 text-base font-normal text-fg; }
+
+  /* Customize fields + settings */
+  .fctable td, .fctable th { @apply align-middle; }
+  .fctable th.pvsec { @apply bg-surface pt-5; }
+  .fctable select { @apply w-auto py-1; min-height: 2rem; }
+  .fctable .ghost { @apply mr-1; }
+  .switch { @apply m-0 inline-flex items-center gap-2 font-normal text-fg-2; }
+  label.check { @apply flex items-center gap-2.5 text-base font-normal text-fg; }
+  h2.sset { @apply mt-8 mb-3 border-t border-border pt-6 text-lg font-semibold; }
+  #sSheetKey { @apply font-mono text-xs; min-height: 4.5rem; }
+
+  /* Activity filters */
+  .filters { @apply grid grid-cols-1 gap-x-3 gap-y-3 sm:grid-cols-2 lg:grid-cols-6; }
+  .filters .wide2 { @apply sm:col-span-2; }
+}

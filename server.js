@@ -23,6 +23,12 @@ app.use(express.static(fileURLToPath(new URL('./public/', import.meta.url)), {
   setHeaders: res => res.setHeader('Cache-Control', 'no-cache'),
 }));
 
+// Without passcodes anyone who can open the page can send to Jira (and change Settings)
+if (!process.env.UI_PASSCODE || !process.env.ADMIN_PASSCODE) {
+  const open = [!process.env.UI_PASSCODE && 'the page', !process.env.ADMIN_PASSCODE && 'Settings'].filter(Boolean).join(' and ');
+  console.warn(`No passcode for ${open}` + (HOST === '127.0.0.1' || HOST === 'localhost' ? ' (only this computer can open it)' : `: anyone on your network can use ${open} at port ${PORT}`));
+}
+
 app.listen(PORT, HOST, async () => {
   try { await whoAmI(); } catch (e) { console.error('Jira auth check failed:', e.message); }
   console.log(`portal-jira-sync listening on http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}/`);

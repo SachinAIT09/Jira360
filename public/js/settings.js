@@ -12,11 +12,12 @@ const SOURCE = { page: 'set here', env: 'from .env', default: 'default' };
 const src = v => `<span class="srctag">${SOURCE[v] || v}</span>`;
 
 $('adminPass').value = adminStore.get();
+const adminOk = () => !auth.admin || !!$('adminPass').value;
 async function loadSettings(fromButton = false) {
-  if (!$('passcode').value || !$('adminPass').value) {
+  if (!passOk() || !adminOk()) {
     $('sform').hidden = true;
     // Opening the tab with nothing typed yet is normal; pressing Unlock without both passcodes gets told why
-    if (fromButton) sshow('err', !$('passcode').value ? 'Enter the team passcode in the Passcode box at the top first.' : 'Enter the admin passcode.');
+    if (fromButton) sshow('err', !passOk() ? 'Enter the team passcode in the Passcode box at the top first.' : 'Enter the admin passcode.');
     return;
   }
   try {
@@ -25,8 +26,9 @@ async function loadSettings(fromButton = false) {
     renderSettings();
     $('sform').hidden = false;
     $('slock').hidden = true;
+    $('adminLock').hidden = !auth.admin; // nothing to lock without an admin passcode
   } catch (err) {
-    $('sform').hidden = true; $('slock').hidden = false;
+    $('sform').hidden = true; $('slock').hidden = !auth.admin;
     if (err.status === 401) adminStore.set('');
     sshow('err', esc(err.message));
   }

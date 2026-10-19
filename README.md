@@ -25,7 +25,8 @@ Files:
 
 | File | What it is |
 |---|---|
-| `public/` | The page: `index.html`, `styles.css`, and one script per tab in `js/` (the only folder that is published) |
+| `public/` | The page: `index.html`, `app.css` (built, see "Styling"), the Inter font in `fonts/`, and one script per tab in `js/` (the only folder that is published) |
+| `src/styles.css` | The design system: Tailwind CSS source for `public/app.css` |
 | `app.js` | The server: wires the routes together. Talks to Jira with the API token |
 | `lib/jira.js` | Jira client, lookups, and the cached lists the form shows |
 | `lib/sync.js` | Creates/updates tickets, moves status, adds comments and work logs (the only code that writes to Jira) |
@@ -100,10 +101,21 @@ The **Settings** tab sets the keys and switches without editing `.env` or restar
 - **AI**: on/off, the Anthropic API key, the model, and the daily request limit. **Test the key** checks it with Anthropic without using a request.
 - **Google Sheet**: the service account key (paste the downloaded .json), the sheet's address, the tab, and how often to check it. The page shows which email to share the sheet with. **Test the sheet** reads it once.
 
-It needs the admin passcode: set `ADMIN_PASSCODE` in `.env` once (use a different, longer one than `UI_PASSCODE`). Without it the tab stays locked. After 10 wrong tries an address is locked out for 10 minutes.
+To keep it for admins only, set `ADMIN_PASSCODE` in `.env` (a different, longer one than `UI_PASSCODE`); after 10 wrong tries an address is locked out for 10 minutes.
+
+**Passcodes are optional on your computer.** Leave `UI_PASSCODE` and/or `ADMIN_PASSCODE` empty (or commented out) and the page doesn't ask for them; the server prints a warning at start if others on the network can reach it (`HOST=0.0.0.0`). On Netlify, where the page is public, both stay required.
 
 How values are used: a value saved in Settings wins over `.env`; **Remove saved key** goes back to the `.env` value. Each value is marked "set here", "from .env" or "default".
 Keys are kept on the server (in `data/` on your computer, in Netlify Blobs on Netlify, like `.env` they are stored as plain text, so keep that folder private) and are never sent back to the page, which shows only the last 4 characters. The admin passcode is remembered only until the browser tab is closed.
+
+### Styling (Tailwind CSS)
+
+The page is styled with **Tailwind CSS v4** (`tailwindcss` and `@tailwindcss/cli` 4.3.3, dev dependencies only).
+- Edit `src/styles.css` (design tokens, light/dark colours, shared components) or the Tailwind classes in `public/index.html`, then run `npm run build:css` (or `npm run watch:css` while working). It writes `public/app.css`; commit that file too, so the server and Netlify need no build step.
+- Colours are semantic tokens (`bg-surface`, `text-muted`, `border-border`, `bg-accent`, …) with a light and a dark value each, so new markup works in both themes.
+- **Theme**: the sun / moon / screen buttons in the header pick light, dark, or the device's setting (default). The choice is saved in the browser and applied before the page appears (no flash).
+- Font: Inter (variable), served from `public/fonts/` (SIL Open Font License, see `Inter-LICENSE.txt`), with system fonts as fallback.
+- `npm audit` lists a denial-of-service issue in the CLI's file watcher (`braces`). It only affects building on a developer machine with crafted file patterns; nothing of it ships in the app.
 
 ### Activity (history)
 

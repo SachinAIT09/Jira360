@@ -22,7 +22,7 @@ $('aiGo').addEventListener('click', async () => {
 
 // A table of suggestions, each with a tick box (all ticked); returns the ticked keys on apply
 function suggestionTable(rows) {
-  return '<table class="sugg"><tr><th></th><th>Field</th><th>Suggestion</th><th>Why</th></tr>' + rows.map(r =>
+  return '<table class="sugg"><tr><th><span class="sr-only">Use</span></th><th>Field</th><th>Suggestion</th><th>Why</th></tr>' + rows.map(r =>
     `<tr><td><input type="checkbox" data-k="${esc(r.key)}" checked aria-label="Use ${esc(r.label)}"></td><td>${esc(r.label)}</td>` +
     `<td class="val"><div>${r.before ? `<span class="was">${esc(r.before)}</span><br>` : ''}${esc(r.value)}</div></td>` +
     `<td class="muted">${esc(r.reason || '')}</td></tr>`).join('') + '</table>';

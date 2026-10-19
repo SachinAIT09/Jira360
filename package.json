@@ -9,7 +9,9 @@
     "node": ">=22.12"
   },
   "scripts": {
-    "start": "node --env-file=.env server.js"
+    "start": "node --env-file=.env server.js",
+    "build:css": "tailwindcss -i src/styles.css -o public/app.css --minify",
+    "watch:css": "tailwindcss -i src/styles.css -o public/app.css --watch"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.135.0",
@@ -20,5 +22,9 @@
   },
   "overrides": {
     "uuid": "^11.1.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "4.3.3",
+    "tailwindcss": "4.3.3"
   }
 }

@@ -23,7 +23,7 @@ const orderedExtras = () => fieldInfo.extra.map((f, i) => [f, i])
   .map(([f]) => f);
 
 async function loadFields() {
-  if (!$('passcode').value) return;
+  if (!passOk()) return;
   try {
     fieldInfo = await api('ui/fields');
     applyFields();
@@ -132,7 +132,7 @@ function renderFieldDialog() {
   const extras = [...fieldInfo.extra].sort((a, b) => (draftOrder.indexOf(a.id) + 1 || 1e6) - (draftOrder.indexOf(b.id) + 1 || 1e6));
   $('fcBody').innerHTML =
     '<p class="hint">"Shown" applies to everyone using this page (and to the Excel template). "Just for me" overrides it in this browser only.</p>' +
-    '<div class="scroll"><table class="fctable"><tr><th>Field</th><th>Type</th><th>Everyone</th><th>Just for me</th><th></th></tr>' +
+    '<div class="scroll"><table class="fctable"><tr><th>Field</th><th>Type</th><th>Everyone</th><th>Just for me</th><th><span class="sr-only">Order</span></th></tr>' +
     `<tr><th colspan="5" class="pvsec">More Jira fields (${extras.length})</th></tr>` +
     (extras.length ? extras.map(f => fcRow(f.id, f.name, KIND_NAMES[f.kind] || f.kind, f.required, true)).join('') : '<tr><td colspan="5" class="empty">No other fields.</td></tr>') +
     '<tr><th colspan="5" class="pvsec">Already on the form</th></tr>' +

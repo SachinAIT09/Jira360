@@ -9,7 +9,7 @@ const when = iso => iso ? new Date(iso).toLocaleString() : '';
 const SOURCES = { portal: 'the portal', sheet: 'the Google Sheet' };
 
 async function loadInbox() {
-  if (!$('passcode').value) return;
+  if (!passOk()) return;
   try {
     inbox = await api('ui/inbox');
     renderInbox();
@@ -71,7 +71,7 @@ function renderInbox() {
   const shown = JSON.stringify(inbox.pending.map(x => [x.id, x.receivedAt, x.check.errors.length]));
   if (shown !== inboxShown) {
     inboxShown = shown;
-    $('ilist').innerHTML = n ? inbox.pending.map(inboxCard).join('') : '<p class="empty" style="margin-top:14px">No changes waiting.</p>';
+    $('ilist').innerHTML = n ? inbox.pending.map(inboxCard).join('') : '<div class="card p-0 sm:p-0"><p class="empty m-0">No changes waiting.</p></div>';
   }
   $('idone').innerHTML = !inbox.decided.length ? '<p class="empty">Nothing decided yet.</p>' :
     '<div class="scroll" style="border:0;margin:0"><table><tr><th>Decided</th><th>Task</th><th>From</th><th>Decision</th><th>By</th></tr>' +

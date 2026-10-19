@@ -11,7 +11,26 @@ const link = (url, text) => `<a href="${esc(url)}" target="_blank" rel="noopener
 const splitList = v => String(v || '').split(',').map(x => x.trim()).filter(Boolean);
 const sameText = (a, b) => String(a).toLowerCase() === String(b).toLowerCase();
 
+// ---------- Colour theme: light, dark, or the device's setting (the default) ----------
+// The <head> script already applied it before the first paint; this keeps it current.
+const darkQuery = window.matchMedia('(prefers-color-scheme: dark)');
+function themeChoice() { try { return localStorage.getItem('jira.theme') || 'system'; } catch { return 'system'; } }
+function applyTheme() {
+  const choice = themeChoice();
+  document.documentElement.dataset.theme = choice === 'dark' || (choice === 'system' && darkQuery.matches) ? 'dark' : 'light';
+  for (const b of document.querySelectorAll('[data-theme-choice]')) b.setAttribute('aria-pressed', String(b.dataset.themeChoice === choice));
+}
+for (const b of document.querySelectorAll('[data-theme-choice]')) b.addEventListener('click', () => {
+  try { if (b.dataset.themeChoice === 'system') localStorage.removeItem('jira.theme'); else localStorage.setItem('jira.theme', b.dataset.themeChoice); } catch {}
+  applyTheme();
+});
+darkQuery.addEventListener('change', () => { if (themeChoice() === 'system') applyTheme(); });
+applyTheme();
+
 $('passcode').value = store.get('jira.passcode', '');
+// Which passcodes the server asks for (start.js asks it first); none set = the boxes are hidden
+let auth = { passcode: true, admin: true };
+const passOk = () => !auth.passcode || !!$('passcode').value;
 let project = 'Jira';
 
 // All calls to the server: adds the passcode, turns error replies and network failures into readable errors
@@ -33,7 +52,7 @@ async function api(path, opts = {}) {
 const postJson = body => ({ method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
 
 function needPass(show) {
-  if ($('passcode').value) return true;
+  if (passOk()) return true;
   show('err', 'Enter the passcode first.');
   $('passcode').focus();
   return false;
@@ -113,7 +132,7 @@ function showParentInfo() {
 $('parentKey').addEventListener('input', showParentInfo);
 
 async function loadOptions() {
-  if (!$('passcode').value) return;
+  if (!passOk()) return;
   $('optsState').textContent = 'Loading lists from Jira…';
   try {
     const o = await api('ui/options');

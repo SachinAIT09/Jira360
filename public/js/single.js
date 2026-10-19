@@ -35,7 +35,7 @@ function forgetTicket() {
 
 async function pullFromJira() {
   const jiraKey = $('jiraKey').value.trim(), taskId = $('taskId').value.trim();
-  if (!$('passcode').value || (!jiraKey && !taskId)) { forgetTicket(); setSync(''); return; }
+  if (!passOk() || (!jiraKey && !taskId)) { forgetTicket(); setSync(''); return; }
   if (busy) return;
   busy = true;
   // The key or task ID may change while a request is out; such answers are ignored
@@ -94,8 +94,8 @@ function showRecent(recent) {
   const item = (who, at, extra, text) => `<div class="ritem"><b>${esc(who)}</b> <span class="muted">${esc(when(at))}${extra ? ' · ' + esc(extra) : ''}</span>${text ? `<p>${esc(text)}</p>` : ''}</div>`;
   $('recentSum').textContent = `Latest in Jira: ${recent.comments.length} comment${recent.comments.length === 1 ? '' : 's'}, ${recent.worklogs.length} work log${recent.worklogs.length === 1 ? '' : 's'}`;
   $('recentBody').innerHTML =
-    (recent.comments.length ? '<h4>Comments</h4>' + recent.comments.map(c => item(c.author, c.created, '', c.body)).join('') : '') +
-    (recent.worklogs.length ? '<h4>Work logged</h4>' + recent.worklogs.map(w => item(w.author, w.started, w.timeSpent, w.comment)).join('') : '');
+    (recent.comments.length ? '<h3>Comments</h3>' + recent.comments.map(c => item(c.author, c.created, '', c.body)).join('') : '') +
+    (recent.worklogs.length ? '<h3>Work logged</h3>' + recent.worklogs.map(w => item(w.author, w.started, w.timeSpent, w.comment)).join('') : '');
   box.hidden = false;
 }
 
@@ -212,8 +212,8 @@ function openPreview({ task, errors, warnings, info }) {
     (any
       ? PV_SECTIONS.map(([name, keys]) => {
           const mine = keys.filter(k => fields.includes(k));
-          return mine.length ? `<h4 class="pvsec">${name}</h4><dl class="kv">${mine.map(k => pvRow(k, task, info)).join('')}</dl>` : '';
-        }).join('') + (extras ? `<h4 class="pvsec">More fields</h4><dl class="kv">${extras}</dl>` : '')
+          return mine.length ? `<h3 class="pvsec">${name}</h3><dl class="kv">${mine.map(k => pvRow(k, task, info)).join('')}</dl>` : '';
+        }).join('') + (extras ? `<h3 class="pvsec">More fields</h3><dl class="kv">${extras}</dl>` : '')
       : `<p>Nothing has changed, so there is nothing to send.</p>`) +
     noteList('err', 'Fix these before sending:', errors) +
     (info.duplicates?.length ? `<div class="note warn"><b>Possible duplicate.</b> ${duplicateNotes(info)[0]}. Confirm only if you really want another ticket.</div>` : '') +

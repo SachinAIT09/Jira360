@@ -25,8 +25,15 @@ function userOf(req) {
   try { return decodeURIComponent(req.get('X-User-Name') || '').trim().slice(0, 80); } catch { return ''; }
 }
 
+// Passcodes are optional on this computer: an empty UI_PASSCODE / ADMIN_PASSCODE means none is asked.
+// On Netlify the site is public, so there they stay required.
+export const onNetlify = !!(process.env.NETLIFY || process.env.AWS_LAMBDA_FUNCTION_NAME);
+
+// Which passcodes the page has to ask for (no passcode needed to ask)
+router.get('/ui/auth', (_req, res) => res.json({ passcode: !!UI_PASSCODE || onNetlify, admin: !!adminPasscode() || onNetlify }));
+
 function uiAuth(req, res, next) {
-  if (!UI_PASSCODE) return fail(res, 503, 'not_configured', 'Form disabled: set UI_PASSCODE on the server');
+  if (!UI_PASSCODE) return onNetlify ? fail(res, 503, 'not_configured', 'Form disabled: set UI_PASSCODE on the server (required on Netlify)') : next();
   const given = req.get('X-UI-Passcode') || '';
   if (given.length !== UI_PASSCODE.length || !crypto.timingSafeEqual(Buffer.from(given), Buffer.from(UI_PASSCODE)))
     return fail(res, 401, 'unauthorized', 'Wrong passcode');
@@ -216,7 +223,7 @@ router.post('/ui/fields/config', uiAuth, async (req, res) => {
 const adminFails = new Map(); // ip -> { n, until }
 async function adminAuth(req, res, next) {
   const admin = adminPasscode();
-  if (!admin) return fail(res, 503, 'not_configured', 'Settings are locked: set ADMIN_PASSCODE in .env (on the server) to use them');
+  if (!admin) return onNetlify ? fail(res, 503, 'not_configured', 'Settings are locked: set ADMIN_PASSCODE on the server (required on Netlify)') : next();
   const ip = req.ip || 'x', f = adminFails.get(ip);
   if (f?.until > Date.now()) return fail(res, 429, 'locked', 'Too many wrong admin passcodes; try again in 10 minutes');
   const given = req.get('X-Admin-Passcode') || '';
