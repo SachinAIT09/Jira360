@@ -6,12 +6,13 @@
   "description": "Portal / HTML form -> Jira create and update service",
   "main": "server.js",
   "engines": {
-    "node": ">=18.11"
+    "node": ">=22.12"
   },
   "scripts": {
     "start": "node --env-file=.env server.js"
   },
   "dependencies": {
+    "@netlify/blobs": "^11.1.4",
     "exceljs": "^4.4.0",
     "express": "^4.21.2",
     "serverless-http": "^3.2.0"

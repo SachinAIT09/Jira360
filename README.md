@@ -162,7 +162,7 @@ npm install
 npm start                 # http://localhost:8080
 ```
 The portal side (`portal-hook.js`, `pushTaskToJira`) is not in this folder yet; it signs each request body with `PORTAL_SHARED_SECRET` and posts it to `/portal/task`.
-Requires Node 18.11+ (`--env-file` and global `fetch`; Node 20 LTS recommended).
+Requires Node 22.12+ (`--env-file`, global `fetch`, and `@netlify/blobs`).
 
 ### Jira setup
 1. Create an integration user (or use a service account) with access to the project.

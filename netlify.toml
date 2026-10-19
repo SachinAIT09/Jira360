@@ -3,6 +3,9 @@
   publish = "public"
   functions = "netlify/functions"
 
+[build.environment]
+  NODE_VERSION = "22"  # @netlify/blobs needs Node 22.12+
+
 [functions]
   node_bundler = "esbuild"
   external_node_modules = ["express", "exceljs", "serverless-http", "@netlify/blobs"]

@@ -6,7 +6,7 @@
 //   lib/store.js  small key/value store that survives restarts
 //
 // Runs two ways: server.js starts it on this computer (npm start), and
-// netlify/functions/api.mjs runs it as a Netlify Function. Node 18+ (uses global fetch).
+// netlify/functions/api.mjs runs it as a Netlify Function. Node 22.12+ (global fetch; @netlify/blobs needs 22.12).
 
 import express from 'express';
 import { missingEnv } from './lib/config.js';
