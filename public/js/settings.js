@@ -12,8 +12,13 @@ const SOURCE = { page: 'set here', env: 'from .env', default: 'default' };
 const src = v => `<span class="srctag">${SOURCE[v] || v}</span>`;
 
 $('adminPass').value = adminStore.get();
-async function loadSettings() {
-  if (!$('passcode').value || !$('adminPass').value) { $('sform').hidden = true; return; }
+async function loadSettings(fromButton = false) {
+  if (!$('passcode').value || !$('adminPass').value) {
+    $('sform').hidden = true;
+    // Opening the tab with nothing typed yet is normal; pressing Unlock without both passcodes gets told why
+    if (fromButton) sshow('err', !$('passcode').value ? 'Enter the team passcode in the Passcode box at the top first.' : 'Enter the admin passcode.');
+    return;
+  }
   try {
     settings = await adminApi('ui/settings');
     adminStore.set($('adminPass').value); // for this browser tab only
@@ -26,7 +31,7 @@ async function loadSettings() {
     sshow('err', esc(err.message));
   }
 }
-$('adminGo').addEventListener('click', () => { $('smsg').className = 'msg'; loadSettings(); });
+$('adminGo').addEventListener('click', () => { $('smsg').className = 'msg'; loadSettings(true); });
 $('adminPass').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('adminGo').click(); } });
 $('adminLock').addEventListener('click', () => { adminStore.set(''); $('adminPass').value = ''; $('sform').hidden = true; $('slock').hidden = false; settings = null; });
 

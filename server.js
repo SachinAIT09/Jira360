@@ -16,7 +16,12 @@ if (missingEnv.length) {
 
 // Serve only public/ (the page, its styles and scripts), never the project folder, so .env and
 // the server code can't be downloaded. Netlify publishes the same folder.
-app.use(express.static(fileURLToPath(new URL('./public/', import.meta.url)), { dotfiles: 'deny' }));
+// no-cache: browsers check for a newer version on every load, so an update is never half-applied
+// (a new page with old scripts).
+app.use(express.static(fileURLToPath(new URL('./public/', import.meta.url)), {
+  dotfiles: 'deny',
+  setHeaders: res => res.setHeader('Cache-Control', 'no-cache'),
+}));
 
 app.listen(PORT, HOST, async () => {
   try { await whoAmI(); } catch (e) { console.error('Jira auth check failed:', e.message); }
