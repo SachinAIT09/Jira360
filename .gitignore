@@ -1,0 +1,7 @@
+# secrets and local-only files: never upload these
+.env
+node_modules/
+.netlify/
+*.zip
+data/
+Jira360/

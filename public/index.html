@@ -1,0 +1,818 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Task to Jira</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --card: #ffffff; --text: #1d2433; --muted: #6b7385; --line: #dfe3ea;
+    --accent: #0c66e4; --accent-text: #ffffff; --ok-bg: #e7f6ee; --ok: #1f7a4d; --err-bg: #fdecec; --err: #b42318;
+    --warn-bg: #fff4e0; --warn: #8a5300;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14171d; --card: #1c2028; --text: #e6e9ef; --muted: #98a0b0; --line: #2e3440;
+      --accent: #579dff; --accent-text: #0b1220; --ok-bg: #13301f; --ok: #6fd39b; --err-bg: #3a1717; --err: #ff8a80;
+      --warn-bg: #3a2c12; --warn: #ffc56b;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 28px 16px 48px; }
+  main.wide { max-width: 1200px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 20px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 20px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 16px; }
+  .grid > * { min-width: 0; }
+  .full { grid-column: 1 / -1; }
+  label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 5px; }
+  .opt { font-weight: 400; color: var(--muted); }
+  input, select, textarea {
+    width: 100%; padding: 9px 10px; border: 1px solid var(--line); border-radius: 7px;
+    background: var(--bg); color: var(--text); font: inherit;
+  }
+  input[type=checkbox] { width: auto; }
+  textarea { min-height: 84px; resize: vertical; }
+  input:focus, select:focus, textarea:focus, button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .row { display: flex; gap: 10px; align-items: center; margin-top: 18px; flex-wrap: wrap; }
+  button { border: 0; border-radius: 7px; padding: 10px 18px; font: inherit; font-weight: 600; cursor: pointer; }
+  .primary { background: var(--accent); color: var(--accent-text); }
+  .ghost { background: transparent; color: var(--muted); border: 1px solid var(--line); }
+  button:disabled { opacity: .6; cursor: not-allowed; }
+  .msg { margin-top: 16px; padding: 12px 14px; border-radius: 8px; display: none; }
+  .msg.ok { display: block; background: var(--ok-bg); color: var(--ok); }
+  .msg.err { display: block; background: var(--err-bg); color: var(--err); }
+  .msg.info { display: block; background: var(--bg); color: var(--muted); border: 1px solid var(--line); }
+  .msg a { color: inherit; font-weight: 600; }
+  h2 { font-size: 15px; margin: 28px 0 10px; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; font-size: 12px; }
+  td a { color: var(--accent); }
+  .empty { color: var(--muted); font-size: 14px; }
+  .section { margin: 8px 0 -4px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+  .section .opt { text-transform: none; letter-spacing: 0; font-weight: 400; }
+  .sync { margin: -4px 0 0; font-size: 13px; color: var(--muted); min-height: 1em; }
+  .sync b { color: var(--text); }
+  .sync a { color: var(--accent); }
+  .fieldnote { margin: 4px 0 0; font-size: 12px; color: var(--muted); min-height: 1em; overflow-wrap: anywhere; }
+  .fieldnote.warnt { color: var(--warn); }
+
+  /* Tag picker (labels, fix versions) */
+  .chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-height: 42px; padding: 5px 6px; border: 1px solid var(--line); border-radius: 7px; background: var(--bg); cursor: text; }
+  .chips:focus-within { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .chips input { flex: 1; min-width: 120px; width: auto; border: 0; padding: 4px; background: transparent; }
+  .chips input:focus { outline: none; }
+  .chip { display: inline-flex; align-items: center; gap: 2px; max-width: 100%; padding: 2px 2px 2px 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--card); font-size: 13px; }
+  .chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .chip button { padding: 0 7px; background: transparent; color: var(--muted); border-radius: 999px; font-size: 15px; line-height: 1.3; }
+  .chip button:hover { color: var(--err); }
+
+  .bar { display: flex; align-items: center; gap: 10px; padding: 12px 16px; flex-wrap: wrap; }
+  .bar label { margin: 0; }
+  .bar input { max-width: 240px; }
+  .bar .opt { font-size: 13px; }
+  .tabs { display: flex; gap: 4px; margin: 18px 0 12px; border-bottom: 1px solid var(--line); overflow-x: auto; }
+  .tabs button { background: transparent; color: var(--muted); border-radius: 7px 7px 0 0; padding: 9px 14px; border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; }
+  .tabs button[aria-selected="true"] { color: var(--text); border-bottom-color: var(--accent); }
+
+  .hint { margin: 0; color: var(--muted); font-size: 14px; }
+  .hint a { color: var(--accent); font-weight: 600; }
+  .drop { position: relative; display: block; margin: 14px 0 0; padding: 26px 16px; border: 2px dashed var(--line); border-radius: 10px; text-align: center; cursor: pointer; font-weight: 400; font-size: 15px; }
+  .drop.over, .drop:focus-within { border-color: var(--accent); }
+  .drop input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+  .bsummary { margin: 18px 0 0; }
+  .scroll { overflow-x: auto; margin-top: 10px; border: 1px solid var(--line); border-radius: 8px; }
+  #btable th, #btable td { white-space: nowrap; }
+  #btable td.wrap { white-space: normal; min-width: 220px; max-width: 340px; }
+  #btable tr.bad td { background: var(--err-bg); }
+  .muted { color: var(--muted); font-size: 12px; }
+  .good { color: var(--ok); }
+  .errt { color: var(--err); }
+  .warnt { color: var(--warn); }
+  .checks div + div { margin-top: 4px; }
+
+  dialog { width: min(580px, calc(100% - 32px)); max-height: calc(100% - 48px); padding: 22px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); color: var(--text); }
+  dialog::backdrop { background: rgb(0 0 0 / .45); }
+  dialog h3 { margin: 0 0 4px; font-size: 18px; }
+  dl.kv { display: grid; grid-template-columns: 150px 1fr; gap: 8px 14px; margin: 16px 0 0; }
+  dl.kv dt { color: var(--muted); font-size: 13px; }
+  dl.kv dd { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+  dl.kv dd.remove { color: var(--err); }
+  .note { margin-top: 14px; padding: 10px 12px; border-radius: 8px; }
+  .note.err { background: var(--err-bg); color: var(--err); }
+  .note.warn { background: var(--warn-bg); color: var(--warn); }
+  .note ul { margin: 4px 0 0; padding-left: 18px; }
+  @media (max-width: 600px) { .grid { grid-template-columns: 1fr; } dl.kv { grid-template-columns: 1fr; gap: 2px; } dl.kv dd { margin-bottom: 8px; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>Post task to Jira</h1>
+  <p class="sub">Create or update Jira tickets one at a time, or many at once from an Excel or CSV file. You see a preview before anything is sent.</p>
+
+  <div class="card bar">
+    <label for="passcode">Passcode</label>
+    <input id="passcode" type="password" autocomplete="current-password">
+    <span id="optsState" class="opt" role="status"></span>
+  </div>
+
+  <div class="tabs" role="tablist">
+    <button type="button" role="tab" id="tabSingle" aria-controls="singlePanel" aria-selected="true">Single ticket</button>
+    <button type="button" role="tab" id="tabBulk" aria-controls="bulkPanel" aria-selected="false">Bulk upload (Excel / CSV)</button>
+  </div>
+
+  <section id="singlePanel" role="tabpanel" aria-labelledby="tabSingle">
+    <form id="f" class="card" autocomplete="off">
+      <div class="grid">
+        <div>
+          <label for="taskId">Task ID <span class="opt">(needed for a new ticket)</span></label>
+          <input id="taskId" name="taskId" placeholder="T-1001">
+        </div>
+        <div>
+          <label for="jiraKey">Jira key <span class="opt">(leave empty for a new ticket)</span></label>
+          <input id="jiraKey" name="jiraKey" placeholder="PCAIDEV-123">
+        </div>
+        <p id="sync" class="sync full" role="status"></p>
+
+        <p class="section full">Ticket details</p>
+        <div class="full">
+          <label for="title">Ticket title</label>
+          <input id="title" name="title" maxlength="254" placeholder="Configure outage SMS template">
+        </div>
+        <div class="full">
+          <label for="description">Ticket description <span class="opt">(replaces the Jira description when filled)</span></label>
+          <textarea id="description" name="description"></textarea>
+        </div>
+        <div>
+          <label for="assigneeId">Assignee</label>
+          <select id="assigneeId" name="assigneeId"><option value="">Unassigned</option></select>
+        </div>
+        <div>
+          <label for="parentKey">Parent ticket <span class="opt">(type to search epics)</span></label>
+          <input id="parentKey" name="parentKey" list="parentList" placeholder="Key or title">
+          <datalist id="parentList"></datalist>
+          <p id="parentInfo" class="fieldnote"></p>
+        </div>
+        <div>
+          <label for="startDate">Start date</label>
+          <input id="startDate" name="startDate" type="date">
+        </div>
+        <div>
+          <label for="dueDate">End date <span class="opt">(Jira due date)</span></label>
+          <input id="dueDate" name="dueDate" type="date">
+        </div>
+        <div>
+          <label for="originalEstimate">Original estimate <span class="opt">(4h, 1d 2h, 30m)</span></label>
+          <input id="originalEstimate" name="originalEstimate" placeholder="4h">
+        </div>
+        <div>
+          <label for="sprint">Sprint</label>
+          <select id="sprint" name="sprint"><option value="">No sprint (backlog)</option></select>
+        </div>
+        <div>
+          <label for="labelsInput">Labels <span class="opt">(pick or type a new one, then Enter)</span></label>
+          <div class="chips" id="labelsBox"><input id="labelsInput" list="labelList" placeholder="Add label"></div>
+          <input type="hidden" id="labels" name="labels">
+          <datalist id="labelList"></datalist>
+          <p id="labelsNote" class="fieldnote"></p>
+        </div>
+        <div>
+          <label for="fixVersionsInput">Fix version</label>
+          <div class="chips" id="fixVersionsBox"><input id="fixVersionsInput" list="versionList" placeholder="Add version"></div>
+          <input type="hidden" id="fixVersions" name="fixVersions">
+          <datalist id="versionList"></datalist>
+          <p id="fixVersionsNote" class="fieldnote"></p>
+        </div>
+        <div>
+          <label for="priority">Priority</label>
+          <select id="priority" name="priority"><option value="">Default</option></select>
+        </div>
+        <div>
+          <label for="status">Status</label>
+          <select id="status" name="status"><option value="">Default (first step)</option></select>
+          <p id="statusInfo" class="fieldnote"></p>
+        </div>
+
+        <p class="section full">Progress update <span class="opt">(optional, for existing tickets)</span></p>
+        <div class="full">
+          <label for="comment">Update / comment</label>
+          <textarea id="comment" name="comment" placeholder="What changed today"></textarea>
+        </div>
+        <div>
+          <label for="hoursSpent">Hours spent <span class="opt">(logged as work)</span></label>
+          <input id="hoursSpent" name="hoursSpent" type="number" min="0" step="0.25" placeholder="0">
+        </div>
+      </div>
+
+      <div class="row">
+        <button class="primary" id="go" type="submit">Review and send</button>
+        <button class="ghost" id="clear" type="button">Clear form</button>
+      </div>
+      <div id="msg" class="msg" role="status"></div>
+    </form>
+  </section>
+
+  <section id="bulkPanel" role="tabpanel" aria-labelledby="tabBulk" hidden>
+    <div class="card">
+      <p class="hint">One row per ticket. Only <b>Title</b> is required. A row with a Jira key, or a Task ID that was sent before, updates that ticket instead of creating a new one.
+        Rows without a Task ID are matched by title, so uploading the same file again updates the tickets instead of duplicating them.
+        <b>Assignee</b> can be an email or the person's name as shown in Jira. Labels in a file are added to a ticket's existing labels.
+        <a href="#" id="tmpl">Download the template</a> to see all the columns.</p>
+      <label class="drop" id="drop">
+        <input id="file" type="file" accept=".xlsx,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
+        <b>Choose an Excel or CSV file</b><br><span class="opt">or drop it here · .xlsx or .csv · up to 200 rows</span>
+      </label>
+      <div id="bmsg" class="msg" role="status"></div>
+
+      <div id="bpreview" hidden>
+        <p id="bsummary" class="bsummary"></p>
+        <div class="scroll"><table id="btable"></table></div>
+        <div class="row">
+          <button class="primary" id="bgo" type="button">Send to Jira</button>
+          <button class="ghost" id="bstop" type="button" hidden>Stop after this row</button>
+          <button class="ghost" id="breset" type="button">Choose another file</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <h2>Recent posts (this browser)</h2>
+  <div id="hist"></div>
+</main>
+
+<dialog id="pv" aria-labelledby="pvTitle">
+  <h3 id="pvTitle"></h3>
+  <div id="pvBody"></div>
+  <div class="row">
+    <button class="primary" id="pvGo" type="button">Confirm and send</button>
+    <button class="ghost" id="pvBack" type="button">Back to edit</button>
+  </div>
+</dialog>
+
+<script>
+const $ = id => document.getElementById(id);
+const store = {
+  get(k, d) { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+};
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const link = (url, text) => `<a href="${esc(url)}" target="_blank" rel="noopener">${esc(text)}</a>`;
+const splitList = v => String(v || '').split(',').map(x => x.trim()).filter(Boolean);
+const sameText = (a, b) => String(a).toLowerCase() === String(b).toLowerCase();
+
+$('passcode').value = store.get('jira.passcode', '');
+let project = 'Jira';
+
+// All calls to the server: adds the passcode, turns error replies and network failures into readable errors
+async function api(path, opts = {}) {
+  let res;
+  try {
+    res = await fetch(path, { ...opts, headers: { ...(opts.headers || {}), 'X-UI-Passcode': $('passcode').value } });
+  } catch {
+    throw new Error("Can't reach the server. Check that it is running.");
+  }
+  // A reply that isn't JSON means the page is hosted somewhere without the Jira server behind it
+  const out = await res.json().catch(() => ({ error: res.status === 404 || res.status === 405
+    ? "This page can't find its Jira server. Open the form from the address where server.js runs (for example http://<that computer>:8080/)."
+    : `HTTP ${res.status}` }));
+  if (!res.ok) throw Object.assign(new Error(out.error || `HTTP ${res.status}`), { status: res.status });
+  return out;
+}
+const postJson = body => ({ method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+
+function needPass(show) {
+  if ($('passcode').value) return true;
+  show('err', 'Enter the passcode first.');
+  $('passcode').focus();
+  return false;
+}
+
+// ---------- History (this browser) ----------
+function renderHistory() {
+  const h = store.get('jira.history', []);
+  if (!h.length) { $('hist').innerHTML = '<p class="empty">Nothing posted yet.</p>'; return; }
+  $('hist').innerHTML = '<div class="scroll" style="border:0;margin:0"><table><tr><th>When</th><th>Task</th><th>Jira</th><th>What happened</th></tr>' +
+    h.map(r => `<tr><td>${esc(r.at)}</td><td>${esc(r.taskId)}</td><td>${link(r.url, r.jiraKey)}</td><td>${esc(r.actions)}</td></tr>`).join('') +
+    '</table></div>';
+}
+function remember(taskId, out) {
+  const keys = store.get('jira.keys', {}); keys[taskId] = out.jiraKey; store.set('jira.keys', keys);
+  const h = store.get('jira.history', []);
+  h.unshift({ at: new Date().toLocaleString(), taskId, jiraKey: out.jiraKey, url: out.url, actions: out.actions.join(', ') });
+  store.set('jira.history', h.slice(0, 50));
+  renderHistory();
+}
+
+// ---------- Tabs ----------
+function showTab(name) {
+  const bulkTab = name === 'bulk';
+  $('singlePanel').hidden = bulkTab;
+  $('bulkPanel').hidden = !bulkTab;
+  $('tabSingle').setAttribute('aria-selected', String(!bulkTab));
+  $('tabBulk').setAttribute('aria-selected', String(bulkTab));
+  document.querySelector('main').classList.toggle('wide', bulkTab);
+  store.set('jira.tab', name);
+}
+$('tabSingle').addEventListener('click', () => showTab('single'));
+$('tabBulk').addEventListener('click', () => showTab('bulk'));
+
+// ---------- Lists from Jira (people, epics, sprints, versions, labels, priorities, statuses) ----------
+let opts = { users: [], parents: [], sprints: [], versions: [], labels: [], priorities: [], statuses: [] };
+
+// Fills a <select>, keeping its current value (adding it as an extra option if Jira's list lacks it)
+function fillSelect(sel, emptyText, items) {
+  const keep = sel.value;
+  sel.innerHTML = `<option value="">${esc(emptyText)}</option>` +
+    items.map(o => `<option value="${esc(o.value)}">${esc(o.text)}</option>`).join('');
+  ensureOption(sel, keep);
+}
+function ensureOption(sel, value, text) {
+  if (value && ![...sel.options].some(o => o.value === value)) sel.add(new Option(text || value, value));
+  sel.value = value || '';
+}
+const fillDatalist = (dl, items) => { dl.innerHTML = items.map(o => `<option value="${esc(o.value)}">${esc(o.text || '')}</option>`).join(''); };
+
+function applyOptions() {
+  fillSelect($('assigneeId'), 'Unassigned', opts.users.map(u => ({ value: u.id, text: u.email ? `${u.name} · ${u.email}` : u.name })));
+  fillSelect($('sprint'), 'No sprint (backlog)', opts.sprints.map(s => ({ value: s.name, text: `${s.name} (${s.state})` })));
+  fillSelect($('priority'), loaded ? 'No change' : 'Default', opts.priorities.map(p => ({ value: p, text: p })));
+  fillDatalist($('parentList'), opts.parents.map(p => ({ value: p.key, text: p.summary })));
+  if (!loaded) setStatusChoices(null);
+  pickers.labels.refresh();
+  pickers.fixVersions.refresh();
+  showParentInfo();
+}
+
+// Status: a new ticket can start in any workflow status; an existing one only where Jira allows it to move
+function setStatusChoices(current, next = []) {
+  const sel = $('status'), keep = sel.value;
+  if (current) {
+    sel.innerHTML = '';
+    for (const name of [current, ...next.filter(n => !sameText(n, current))])
+      sel.add(new Option(sameText(name, current) ? `${name} (current)` : name, name));
+    ensureOption(sel, keep || current);
+    $('statusInfo').textContent = next.length ? `${next.filter(n => !sameText(n, current)).length} moves allowed from ${current}` : '';
+  } else {
+    fillSelect(sel, 'Default (first step)', opts.statuses.map(s => ({ value: s, text: s })));
+    $('statusInfo').textContent = '';
+  }
+}
+
+function showParentInfo() {
+  const key = $('parentKey').value.trim().toUpperCase();
+  const p = opts.parents.find(x => x.key === key) || (loaded?.parent?.key === key ? loaded.parent : null);
+  $('parentInfo').textContent = !key ? '' : p ? p.summary : 'Not an open epic here; it will be checked when you review';
+}
+$('parentKey').addEventListener('input', showParentInfo);
+
+async function loadOptions() {
+  if (!$('passcode').value) return;
+  $('optsState').textContent = 'Loading lists from Jira…';
+  try {
+    const o = await api('ui/options');
+    project = o.project;
+    opts = o;
+    applyOptions();
+    $('optsState').textContent = o.failed?.length ? `Couldn't load from Jira: ${o.failed.join(', ')}` : `Lists loaded from ${o.project}`;
+  } catch (err) {
+    $('optsState').textContent = err.status === 401 ? 'Wrong passcode' : `Lists not loaded: ${err.message}`;
+  }
+}
+
+// ---------- Tag pickers (labels, fix versions) ----------
+// The chosen tags live in a hidden input as "a, b", so the rest of the form treats them as text.
+function makePicker(id, { listId, source, allowNew, noun }) {
+  const hidden = $(id), box = $(id + 'Box'), input = $(id + 'Input'), note = $(id + 'Note');
+  const values = () => splitList(hidden.value);
+  const set = list => { hidden.value = [...new Set(list)].join(', '); render(); };
+  function render() {
+    box.querySelectorAll('.chip').forEach(c => c.remove());
+    for (const v of values()) {
+      const chip = document.createElement('span');
+      chip.className = 'chip';
+      chip.innerHTML = `<span title="${esc(v)}">${esc(v)}</span><button type="button" aria-label="Remove ${esc(v)}">×</button>`;
+      chip.querySelector('button').addEventListener('click', () => { set(values().filter(x => x !== v)); input.focus(); });
+      box.insertBefore(chip, input);
+    }
+    refresh();
+  }
+  // Suggestions leave out what is already chosen
+  function refresh() {
+    const chosen = values().map(v => v.toLowerCase());
+    fillDatalist($(listId), source().filter(o => !chosen.includes(o.value.toLowerCase())));
+  }
+  function add(raw) {
+    note.textContent = ''; note.className = 'fieldnote';
+    const known = source().map(o => o.value);
+    for (let v of splitList(raw)) {
+      const match = known.find(k => sameText(k, v));
+      if (!match && !allowNew) { note.textContent = `"${v}" isn't a ${noun} in Jira`; note.className = 'fieldnote warnt'; continue; }
+      if (!match && /\s/.test(v)) { v = v.replace(/\s+/g, '-'); note.textContent = `Spaces aren't allowed in labels, so it became "${v}"`; }
+      if (!match && known.length) note.textContent ||= `"${v}" is a new label`;
+      v = match || v;
+      if (!values().some(x => sameText(x, v))) set([...values(), v]);
+    }
+    input.value = '';
+  }
+  input.addEventListener('keydown', e => {
+    if ((e.key === 'Enter' || e.key === ',') && input.value.trim()) { e.preventDefault(); add(input.value); }
+    else if (e.key === 'Enter') e.preventDefault(); // don't submit the form from here
+    else if (e.key === 'Backspace' && !input.value && values().length) set(values().slice(0, -1));
+  });
+  // Picking a suggestion from the list adds it straight away
+  input.addEventListener('input', e => {
+    if ((!e.inputType || e.inputType === 'insertReplacementText') && source().some(o => o.value === input.value)) add(input.value);
+  });
+  input.addEventListener('blur', () => { if (input.value.trim()) add(input.value); });
+  box.addEventListener('click', e => { if (e.target === box) input.focus(); });
+  return { render, refresh, set, clear: () => { set([]); note.textContent = ''; } };
+}
+const pickers = {
+  labels: makePicker('labels', { listId: 'labelList', allowNew: true, noun: 'label',
+    source: () => opts.labels.map(l => ({ value: l })) }),
+  fixVersions: makePicker('fixVersions', { listId: 'versionList', allowNew: false, noun: 'version',
+    source: () => [...opts.versions].sort((a, b) => a.released - b.released).map(v => ({ value: v.name, text: v.released ? 'released' : 'unreleased' })) }),
+};
+
+// ---------- Single ticket: live sync from Jira ----------
+// Fields filled from Jira. Every 10 s the page re-reads the ticket and refreshes any field
+// you haven't edited since the last read; your unsent edits are kept.
+const SYNCED = ['title', 'description', 'assigneeId', 'parentKey', 'startDate', 'dueDate',
+  'originalEstimate', 'sprint', 'labels', 'fixVersions', 'priority', 'status'];
+// Emptying one of these on an existing ticket removes the value in Jira
+const CLEARABLE = ['assigneeId', 'startDate', 'dueDate', 'sprint', 'labels', 'fixVersions'];
+const POLL_MS = 10000;
+let loaded = null;   // { jiraKey, values, parent } as last read from Jira
+let busy = false;
+
+function show(kind, html) { const m = $('msg'); m.className = 'msg ' + kind; m.innerHTML = html; }
+const setSync = html => { $('sync').innerHTML = html; };
+
+// Puts a value from Jira into a field, whatever kind of field it is
+function setField(k, v, out) {
+  const el = $(k);
+  if (k === 'assigneeId') ensureOption(el, v, out.assignee?.name);
+  else if (k === 'sprint') ensureOption(el, v, v && `${v} (${out.sprintState || 'closed'})`);
+  else if (el.tagName === 'SELECT') ensureOption(el, v);
+  else el.value = v ?? '';
+  if (pickers[k]) pickers[k].render();
+}
+
+function forgetTicket() {
+  const hadTicket = !!loaded;
+  loaded = null;
+  $('priority').options[0].text = 'Default';
+  setStatusChoices(null);
+  if (hadTicket) $('status').value = ''; // the old ticket's status means nothing for a new one
+}
+
+async function pullFromJira() {
+  const jiraKey = $('jiraKey').value.trim(), taskId = $('taskId').value.trim();
+  if (!$('passcode').value || (!jiraKey && !taskId)) { forgetTicket(); setSync(''); return; }
+  if (busy) return;
+  busy = true;
+  // The key or task ID may change while a request is out; such answers are ignored
+  const stale = () => jiraKey !== $('jiraKey').value.trim() || taskId !== $('taskId').value.trim();
+  try {
+    const q = new URLSearchParams();
+    if (jiraKey) q.set('jiraKey', jiraKey);
+    if (taskId) q.set('taskId', taskId);
+    let out;
+    try { out = await api('ui/issue?' + q); }
+    catch (e) {
+      if (stale()) return;
+      if (e.status === 404 && !jiraKey) { forgetTicket(); setSync('New ticket: it will be created when you send.'); return; }
+      throw e.status === 404 ? new Error(`${jiraKey} not found in Jira`) : e;
+    }
+    if (stale()) return;
+
+    const same = loaded && loaded.jiraKey === out.jiraKey;
+    // Status choices depend on the ticket's current status; keep a status you picked but haven't sent
+    const statusEdited = same && $('status').value !== loaded.values.status;
+    setStatusChoices(out.statusName, out.nextStatuses);
+    if (!statusEdited) $('status').value = out.statusName;
+    $('priority').options[0].text = 'No change';
+
+    const snapshot = {};
+    let kept = 0;
+    for (const k of SYNCED) {
+      if (same && $(k).value !== loaded.values[k]) { kept++; snapshot[k] = loaded.values[k]; continue; } // edited here
+      setField(k, out.values[k], out);
+      snapshot[k] = $(k).value; // what the field really holds
+    }
+    loaded = { jiraKey: out.jiraKey, values: snapshot, parent: out.parent };
+    $('jiraKey').value = out.jiraKey;
+    showParentInfo();
+
+    setSync(`Synced with ${link(out.url, out.jiraKey)} · Status: <b>${esc(out.statusName)}</b>` +
+      ` · checked ${new Date().toLocaleTimeString()}` + (kept ? ` · keeping ${kept} field${kept > 1 ? 's' : ''} you edited` : ''));
+  } catch (err) {
+    setSync('Jira sync failed: ' + esc(err.message));
+  } finally {
+    busy = false;
+  }
+}
+
+setInterval(() => { if (loaded && document.visibilityState === 'visible') pullFromJira(); }, POLL_MS);
+document.addEventListener('visibilitychange', () => { if (loaded && document.visibilityState === 'visible') pullFromJira(); });
+
+// Remember the Jira key per task so the next post goes straight to the same issue
+$('taskId').addEventListener('change', () => {
+  const known = store.get('jira.keys', {})[$('taskId').value.trim()];
+  if (known && !$('jiraKey').value) $('jiraKey').value = known;
+  pullFromJira();
+});
+$('jiraKey').addEventListener('change', pullFromJira);
+
+$('clear').addEventListener('click', () => {
+  $('f').reset(); $('msg').className = 'msg';
+  pickers.labels.clear(); pickers.fixVersions.clear();
+  forgetTicket(); setSync(''); showParentInfo();
+});
+
+// ---------- Single ticket: preview, then send ----------
+const LABELS = {
+  title: 'Title', description: 'Description', assigneeId: 'Assignee', assigneeEmail: 'Assignee', parentKey: 'Parent ticket',
+  startDate: 'Start date', dueDate: 'End date', originalEstimate: 'Original estimate', sprint: 'Sprint',
+  labels: 'Labels', fixVersions: 'Fix version', priority: 'Priority', status: 'Status',
+  comment: 'Comment', hoursSpent: 'Log work',
+};
+function shownValue(k, v, info) {
+  if ((k === 'assigneeId' || k === 'assigneeEmail') && info.assigneeName) return info.assigneeName;
+  if (k === 'parentKey' && info.parentSummary) return `${v}: ${info.parentSummary}`;
+  if (k === 'status') return info.statusName || v;
+  if (k === 'hoursSpent') return `${v} hours`;
+  return v;
+}
+const noteList = (kind, title, items) => items.length
+  ? `<div class="note ${kind}"><b>${title}</b><ul>${items.map(x => `<li>${esc(x)}</li>`).join('')}</ul></div>` : '';
+
+function setBusy(on, text) { $('go').disabled = on; $('go').textContent = on ? text : 'Review and send'; }
+
+let pending = null; // checked task waiting for "Confirm and send"
+
+$('f').addEventListener('submit', async e => {
+  e.preventDefault();
+  if (!needPass(show)) return;
+  // A tag typed but not yet confirmed with Enter still counts
+  for (const k of Object.keys(pickers)) if ($(k + 'Input').value.trim()) $(k + 'Input').dispatchEvent(new Event('blur'));
+  const data = {};
+  for (const [k, v] of new FormData($('f'))) { const t = String(v).trim(); if (t) data[k] = t; }
+  if (data.hoursSpent) data.hoursSpent = Number(data.hoursSpent);
+  // An existing ticket can be updated by its Jira key alone; a new one needs a Task ID to be found again later
+  if (!data.taskId) {
+    if (!data.jiraKey) { show('err', 'Enter a Task ID for a new ticket, or a Jira key to update one.'); $('taskId').focus(); return; }
+    data.taskId = data.jiraKey.toUpperCase();
+  }
+  // For a ticket loaded from Jira, send only what was changed here, so untouched fields
+  // (like a richly formatted description) aren't rewritten. Emptied fields are removed in Jira.
+  if (loaded && sameText(loaded.jiraKey, data.jiraKey || '')) {
+    const clear = [];
+    for (const k of SYNCED) {
+      const now = (data[k] || ''), before = (loaded.values[k] || '').trim();
+      if (now === before) delete data[k];
+      else if (!now && CLEARABLE.includes(k)) clear.push(k);
+    }
+    if (clear.length) data.clear = clear;
+    data.replaceLists = true; // labels / fix versions shown here are the full list
+  }
+
+  setBusy(true, 'Checking…');
+  try {
+    pending = await api('ui/preview', postJson(data));
+    openPreview(pending);
+  } catch (err) {
+    show('err', 'Failed: ' + esc(err.message));
+  } finally {
+    setBusy(false);
+  }
+});
+
+function openPreview({ task, errors, warnings, info }) {
+  const update = info.action === 'update';
+  const fields = Object.keys(LABELS).filter(k => task[k] !== undefined && task[k] !== '' && !(k === 'assigneeEmail' && task.assigneeId));
+  const cleared = (task.clear || []).filter(k => LABELS[k]);
+  $('pvTitle').textContent = update ? `Update ${info.existingKey}` : `Create a new ticket in ${project}`;
+  $('pvBody').innerHTML =
+    `<p class="muted">Task ID ${esc(task.taskId)}${update ? ` · ${link(info.url, 'open in Jira')} · only the fields below change` : ''}</p>` +
+    (fields.length || cleared.length
+      ? `<dl class="kv">${fields.map(k => `<dt>${LABELS[k]}</dt><dd>${esc(shownValue(k, task[k], info))}</dd>`).join('')}` +
+        `${cleared.map(k => `<dt>${LABELS[k]}</dt><dd class="remove">Remove from the ticket</dd>`).join('')}</dl>`
+      : `<p>Nothing has changed, so there is nothing to send.</p>`) +
+    noteList('err', 'Fix these before sending:', errors) +
+    (info.duplicates?.length ? `<div class="note warn"><b>Possible duplicate.</b> ${duplicateNotes(info)[0]}. Confirm only if you really want another ticket.</div>` : '') +
+    noteList('warn', 'Please note:', warnings);
+  $('pvGo').disabled = !!errors.length || !(fields.length || cleared.length);
+  $('pvGo').textContent = update ? 'Confirm and update' : 'Confirm and create';
+  $('pv').showModal();
+  (errors.length || !(fields.length || cleared.length) ? $('pvBack') : $('pvGo')).focus();
+}
+$('pvBack').addEventListener('click', () => $('pv').close());
+
+$('pvGo').addEventListener('click', async () => {
+  $('pv').close();
+  const task = pending.task;
+  setBusy(true, 'Sending…');
+  try {
+    const out = await api('ui/task', postJson(task));
+    remember(task.taskId, out);
+    $('jiraKey').value = out.jiraKey;
+    $('comment').value = ''; $('hoursSpent').value = '';
+    loaded = null; pullFromJira(); // reload everything from Jira, including what was just sent
+    show('ok', `Done: ${link(out.url, out.jiraKey)} (${esc(out.actions.join(', ') || 'no changes')})` +
+      (out.warning ? `<br>Note: ${esc(out.warning)}` : ''));
+  } catch (err) {
+    show('err', 'Failed: ' + esc(err.message));
+  } finally {
+    setBusy(false);
+  }
+});
+
+// ---------- Bulk upload: read file, preview rows, send the ticked ones ----------
+let bulk = null;       // { fileName, rows: [{ row, task, errors, warnings, info, selected, done, sending, result }], ignoredColumns }
+let running = false, stopAsked = false;
+
+function bshow(kind, html) { const m = $('bmsg'); m.className = 'msg ' + kind; m.innerHTML = html; }
+
+async function uploadFile(file) {
+  if (!file || !needPass(bshow)) return;
+  if (!/\.(xlsx|csv)$/i.test(file.name)) return bshow('err', 'Choose an .xlsx or .csv file. Old .xls files: open in Excel and use Save As .xlsx.');
+  if (file.size > 5 * 1024 * 1024) return bshow('err', 'The file is larger than 5 MB.');
+  bulk = null;
+  $('bpreview').hidden = true;
+  bshow('info', `Reading <b>${esc(file.name)}</b>…`);
+  let mine;
+  try {
+    // Step 1: the server reads the file and finds duplicates inside it
+    const out = await api('ui/bulk/parse', { method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: file });
+    mine = bulk = { ...out, fileName: file.name, rows: out.rows.map(r => ({ ...r, warnings: [], checking: true, selected: false })) };
+    renderBulk();
+  } catch (err) {
+    return bshow('err', esc(err.message));
+  }
+  // Step 2: check the rows against Jira a few at a time, so every request stays short
+  const rows = mine.rows, size = mine.checkChunk || 10;
+  for (let i = 0; i < rows.length; i += size) {
+    if (bulk !== mine) return; // another file was chosen meanwhile
+    bshow('info', `Checking rows against Jira: ${i} of ${rows.length}…`);
+    const chunk = rows.slice(i, i + size);
+    try {
+      const out = await api('ui/bulk/check', postJson({ rows: chunk.map(r => ({ row: r.row, task: r.task })) }));
+      out.rows.forEach((c, j) => {
+        const r = chunk[j];
+        Object.assign(r, { task: c.task, errors: [...r.errors, ...c.errors], warnings: c.warnings, info: { ...r.info, ...c.info }, checking: false });
+        r.selected = !r.errors.length && !r.info.suggestUntick;
+      });
+    } catch (err) {
+      for (const r of rows.slice(i)) Object.assign(r, { errors: [...r.errors, 'Not checked: ' + err.message], checking: false, selected: false });
+      if (bulk === mine) { renderBulk(); bshow('err', 'Checking stopped: ' + esc(err.message)); }
+      return;
+    }
+    if (bulk === mine) renderBulk();
+  }
+  if (bulk === mine) $('bmsg').className = 'msg';
+}
+$('file').addEventListener('change', () => { uploadFile($('file').files[0]); $('file').value = ''; });
+for (const ev of ['dragenter', 'dragover']) $('drop').addEventListener(ev, () => $('drop').classList.add('over'));
+for (const ev of ['dragleave', 'drop']) $('drop').addEventListener(ev, () => $('drop').classList.remove('over'));
+
+const sendable = r => r.selected && !r.done && !r.checking && !r.errors.length;
+
+// "Possible duplicate" lines with links to the matching Jira tickets / file rows
+function duplicateNotes(info) {
+  const out = [];
+  if (info.duplicates?.length)
+    out.push('Same title already in Jira: ' + info.duplicates.map(d => `${link(d.url, d.key)} (${esc(d.status)})`).join(', '));
+  if (info.sameTitleRow) out.push(`Same title as row ${info.sameTitleRow} in this file`);
+  return out;
+}
+
+function checksCell(r) {
+  if (r.sending) return '<span class="muted">Sending…</span>';
+  if (r.checking) return '<span class="muted">Checking…</span>';
+  if (r.result?.ok) {
+    const what = r.result.actions.includes('created') ? 'Created' : 'Updated';
+    return `<div class="good">✓ ${what} ${link(r.result.url, r.result.jiraKey)}</div>` +
+      (r.result.warning ? `<div class="warnt">${esc(r.result.warning)}</div>` : '');
+  }
+  if (r.result) return `<div class="errt">✗ ${esc(r.result.error)}</div>`;
+  const lines = r.errors.map(x => `<div class="errt">✗ ${esc(x)}</div>`)
+    .concat(duplicateNotes(r.info).map(x => `<div class="warnt">! Possible duplicate. ${x}. Tick the row only if you want another ticket.</div>`))
+    .concat(r.warnings.map(x => `<div class="warnt">! ${esc(x)}</div>`));
+  return lines.join('') || '<span class="good">Ready</span>';
+}
+
+function renderBulk() {
+  const rows = bulk.rows;
+  const checking = rows.filter(r => r.checking).length;
+  // Each row is counted once: still checking, with problems, possible duplicate, or ready
+  const problems = rows.filter(r => !r.checking && r.errors.length).length;
+  const maybeDupes = rows.filter(r => !r.checking && !r.errors.length && r.info.suggestUntick).length;
+  const todo = rows.filter(sendable);
+  const creates = todo.filter(r => r.info.action === 'create').length, updates = todo.length - creates;
+  $('bsummary').innerHTML = `<b>${esc(bulk.fileName)}</b>: ${rows.length} row${rows.length === 1 ? '' : 's'} · ` +
+    (checking ? `<span class="muted">${checking} still being checked</span> · ` : '') +
+    `<span class="good">${rows.length - checking - problems - maybeDupes} ready</span>` +
+    (maybeDupes ? ` · <span class="warnt">${maybeDupes} possible duplicate${maybeDupes === 1 ? '' : 's'} (unticked)</span>` : '') +
+    (problems ? ` · <span class="errt">${problems} with problems (not sent)</span>` : '') +
+    (bulk.ignoredColumns.length ? ` · <span class="muted">ignored columns: ${esc(bulk.ignoredColumns.join(', '))}</span>` : '');
+
+  const eligible = rows.filter(r => !r.errors.length && !r.done && !r.checking);
+  const allOn = eligible.length && eligible.every(r => r.selected);
+  const cell = v => `<td>${esc(v || '')}</td>`;
+  $('btable').innerHTML =
+    `<thead><tr><th><input type="checkbox" id="ball" aria-label="Tick all ready rows" ${allOn ? 'checked' : ''} ${running || !eligible.length ? 'disabled' : ''}></th>` +
+    '<th>Row</th><th>Will</th><th>Checks / result</th><th>Title</th><th>Assignee</th><th>Parent</th><th>Start</th><th>End</th>' +
+    '<th>Estimate</th><th>Sprint</th><th>Labels</th><th>Fix version</th><th>Priority</th><th>Status</th></tr></thead><tbody>' +
+    rows.map((r, i) => {
+      const t = r.task, d = t.description || '';
+      const will = r.info.action === 'update' ? `Update ${link(r.info.url, r.info.existingKey)}` : r.info.action === 'create' ? 'Create' : '–';
+      return `<tr class="${r.errors.length ? 'bad' : ''}">` +
+        `<td><input type="checkbox" data-i="${i}" aria-label="Send row ${r.row}" ${r.selected && !r.done ? 'checked' : ''} ${r.errors.length || r.done || r.checking || running ? 'disabled' : ''}></td>` +
+        `<td>${r.row}</td><td>${will}</td><td class="wrap checks">${checksCell(r)}</td>` +
+        `<td class="wrap">${esc(t.title || '')}${d ? `<div class="muted">${esc(d.length > 90 ? d.slice(0, 90) + '…' : d)}</div>` : ''}</td>` +
+        `<td title="${esc(t.assigneeEmail || '')}">${esc(r.info.assigneeName || t.assigneeEmail || '')}</td>` +
+        `<td title="${esc(r.info.parentSummary || '')}">${esc(t.parentKey || '')}</td>` +
+        cell(t.startDate) + cell(t.dueDate) + cell(t.originalEstimate) + cell(t.sprint) + cell(t.labels) + cell(t.fixVersions) +
+        cell(t.priority) + cell(r.info.statusName || t.status) + '</tr>';
+    }).join('') + '</tbody>';
+
+  $('bgo').textContent = todo.length
+    ? `Send ${todo.length} to Jira (${creates} new, ${updates} update${updates === 1 ? '' : 's'})` : 'Nothing ticked to send';
+  $('bgo').disabled = running || !!checking || !todo.length;
+  $('breset').disabled = running;
+  $('bstop').hidden = !running;
+  $('bpreview').hidden = false;
+}
+
+$('btable').addEventListener('change', e => {
+  if (!bulk || running) return;
+  if (e.target.id === 'ball') bulk.rows.forEach(r => { if (!r.errors.length && !r.done && !r.checking) r.selected = e.target.checked; });
+  else if (e.target.dataset.i) bulk.rows[+e.target.dataset.i].selected = e.target.checked;
+  renderBulk();
+});
+
+$('bgo').addEventListener('click', async () => {
+  const todo = bulk?.rows.filter(sendable) || [];
+  if (!todo.length || running || !needPass(bshow)) return;
+  running = true; stopAsked = false;
+  $('bstop').disabled = false; $('bstop').textContent = 'Stop after this row';
+  let created = 0, updated = 0, failed = 0, halted = '';
+  bshow('info', `Sending ${todo.length} row${todo.length === 1 ? '' : 's'} to Jira, one at a time…`);
+  for (const r of todo) {
+    if (stopAsked) { halted = 'Stopped before the remaining rows.'; break; }
+    r.sending = true; renderBulk();
+    try {
+      const out = await api('ui/task', postJson(r.task));
+      r.result = { ok: true, ...out };
+      r.done = true;
+      out.actions.includes('created') ? created++ : updated++;
+      remember(r.task.taskId, out);
+    } catch (err) {
+      r.result = { ok: false, error: err.message };
+      failed++;
+      // A wrong passcode or a stopped server will fail every row, so stop here
+      if (err.status === 401 || err.status === 503 || !err.status) { halted = 'Stopped: ' + err.message; r.sending = false; break; }
+    }
+    r.sending = false;
+  }
+  running = false;
+  renderBulk();
+  const summary = `Finished: ${created} created, ${updated} updated` + (failed ? `, ${failed} failed` : '') + '.';
+  bshow(failed || halted ? 'err' : 'ok', esc(summary) + (halted ? ' ' + esc(halted) : '') +
+    (failed || halted ? ' Rows that were not sent are still ticked; click Send again to retry them.' : ''));
+});
+$('bstop').addEventListener('click', () => { stopAsked = true; $('bstop').disabled = true; $('bstop').textContent = 'Stopping…'; });
+$('breset').addEventListener('click', () => {
+  bulk = null; $('bpreview').hidden = true; $('bmsg').className = 'msg';
+  $('file').click();
+});
+
+// Template is built here rather than downloaded, so it works even where the server isn't reachable
+$('tmpl').addEventListener('click', e => {
+  e.preventDefault();
+  const rows = [
+    ['Task ID', 'Jira key', 'Title', 'Description', 'Assignee', 'Parent ticket', 'Start date', 'End date',
+      'Original estimate', 'Sprint', 'Labels', 'Fix version', 'Priority', 'Status'],
+    ['T-2001', '', 'Example: configure outage SMS template (delete this row)', 'Set up the SMS text sent during outages.',
+      'name@company.com', '', '2026-10-20', '2026-10-24', '1d 4h', '', 'sms, outage', '', 'Medium', 'To Do'],
+  ];
+  const csv = rows.map(r => r.map(v => /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v).join(',')).join('\r\n') + '\r\n';
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' })); // BOM so Excel reads UTF-8
+  a.download = 'jira-bulk-template.csv';
+  document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+});
+
+$('passcode').addEventListener('change', () => { store.set('jira.passcode', $('passcode').value); loadOptions(); pullFromJira(); });
+
+showTab(store.get('jira.tab', 'single'));
+renderHistory();
+loadOptions();
+</script>
+</body>
+</html>

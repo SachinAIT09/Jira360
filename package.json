@@ -1,0 +1,22 @@
+{
+  "name": "jira-portal-sync",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Portal / HTML form -> Jira create and update service",
+  "main": "server.js",
+  "engines": {
+    "node": ">=18.11"
+  },
+  "scripts": {
+    "start": "node --env-file=.env server.js"
+  },
+  "dependencies": {
+    "exceljs": "^4.4.0",
+    "express": "^4.21.2",
+    "serverless-http": "^3.2.0"
+  },
+  "overrides": {
+    "uuid": "^11.1.1"
+  }
+}

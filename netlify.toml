@@ -1,0 +1,28 @@
+# Netlify: publish only the page; everything else runs in the "api" function.
+[build]
+  publish = "public"
+  functions = "netlify/functions"
+
+[functions]
+  node_bundler = "esbuild"
+  external_node_modules = ["express", "exceljs", "serverless-http"]
+
+[[redirects]]
+  from = "/ui/*"
+  to = "/.netlify/functions/api/ui/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/portal/*"
+  to = "/.netlify/functions/api/portal/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/jira/*"
+  to = "/.netlify/functions/api/jira/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/health"
+  to = "/.netlify/functions/api/health"
+  status = 200
