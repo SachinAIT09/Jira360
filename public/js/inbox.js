@@ -12,6 +12,7 @@ async function loadInbox() {
   if (!passOk()) return;
   try {
     inbox = await api('ui/inbox');
+    if (/err/.test($('imsg').className)) $('imsg').className = 'msg';
     renderInbox();
   } catch (err) {
     if (!$('inboxPanel').hidden) ishow('err', 'Inbox not loaded: ' + esc(err.message));

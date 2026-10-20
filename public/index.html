@@ -22,7 +22,51 @@
 <body>
 <a href="#main" class="sr-only z-50 rounded-md bg-surface px-3 py-2 text-fg shadow-card focus:not-sr-only focus:fixed focus:top-3 focus:left-3">Skip to content</a>
 
-<div class="shell">
+<!-- Sign in, create the first admin, or choose a new password (shown instead of the app) -->
+<div id="gate" class="gate" hidden>
+  <div class="gatecard">
+    <div class="flex items-center gap-3">
+      <svg class="size-9 shrink-0" viewBox="0 0 32 32" aria-hidden="true">
+        <defs><linearGradient id="gateg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7c6cff"/><stop offset="1" stop-color="#2f6bff"/></linearGradient></defs>
+        <rect width="32" height="32" rx="9" fill="url(#gateg)"/><path d="M19 8v10.5a5 5 0 0 1-9.6 2" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+      </svg>
+      <p class="m-0 text-md font-semibold">Jira360</p>
+    </div>
+
+    <form id="loginForm" hidden>
+      <h1>Sign in</h1>
+      <p class="hint">Use the email and password an admin gave you.</p>
+      <div><label for="lEmail">Email</label><input id="lEmail" type="email" autocomplete="username" required></div>
+      <div><label for="lPass">Password</label><input id="lPass" type="password" autocomplete="current-password" required></div>
+      <button class="primary btn-block" type="submit">Sign in</button>
+    </form>
+
+    <form id="setupForm" hidden>
+      <h1>Create the first admin</h1>
+      <p class="hint">Nobody has an account yet. The first one is an admin, who can then add everyone else from Settings.</p>
+      <div><label for="suName">Your name</label><input id="suName" autocomplete="name" required></div>
+      <div><label for="suEmail">Email</label><input id="suEmail" type="email" autocomplete="username" required></div>
+      <div><label for="suPass">Password <span class="opt" id="suMin"></span></label><input id="suPass" type="password" autocomplete="new-password" required></div>
+      <div id="suCodeBox"><label for="suCode">Setup code <span class="opt">(ADMIN_PASSCODE in the server settings)</span></label><input id="suCode" type="password" autocomplete="off"></div>
+      <button class="primary btn-block" type="submit">Create admin and sign in</button>
+    </form>
+
+    <form id="pwForm" hidden>
+      <h1>Choose a new password</h1>
+      <p class="hint" id="pwWhy"></p>
+      <input type="email" id="pwUser" autocomplete="username" hidden>
+      <div><label for="pwCur">Current password</label><input id="pwCur" type="password" autocomplete="current-password" required></div>
+      <div><label for="pwNew">New password <span class="opt" id="pwMin"></span></label><input id="pwNew" type="password" autocomplete="new-password" required></div>
+      <div><label for="pwNew2">New password again</label><input id="pwNew2" type="password" autocomplete="new-password" required></div>
+      <button class="primary btn-block" type="submit">Save new password</button>
+      <button class="ghost btn-block" type="button" id="pwCancel">Cancel</button>
+    </form>
+
+    <div id="gatemsg" class="msg" role="status"></div>
+  </div>
+</div>
+
+<div class="shell" id="shell" hidden>
   <!-- Sidebar (a drawer on small screens) -->
   <aside id="sidebar" class="sidebar" aria-label="Main menu">
     <div class="brand">
@@ -47,6 +91,9 @@
       <button type="button" class="navitem" role="tab" id="tabInbox" aria-controls="inboxPanel" aria-selected="false">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
         Inbox<span id="ibadge" class="badge" hidden></span></button>
+      <button type="button" class="navitem" role="tab" id="tabDashboard" aria-controls="dashPanel" aria-selected="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><path d="M7 16v-5M12 16V8M17 16v-3"/></svg>
+        Dashboard</button>
       <button type="button" class="navitem" role="tab" id="tabActivity" aria-controls="activityPanel" aria-selected="false">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5M12 7v5l4 2"/></svg>
         Activity</button>
@@ -57,13 +104,16 @@
 
     <div class="sidefoot">
       <p id="optsState" class="connection off m-0" role="status">Connecting to Jira…</p>
-      <div>
-        <label for="who" class="sr-only">Your name</label>
-        <input id="who" autocomplete="name" placeholder="Your name (for the history)">
+      <div class="mebox">
+        <span class="meavatar" id="meInitial" aria-hidden="true"></span>
+        <div class="min-w-0">
+          <p class="mename" id="meName"></p>
+          <p class="merole" id="meRole"></p>
+        </div>
       </div>
-      <div>
-        <label for="passcode" class="sr-only">Passcode</label>
-        <input id="passcode" type="password" autocomplete="current-password" placeholder="Team passcode">
+      <div class="flex gap-2">
+        <button type="button" class="melink" id="mePw">Change password</button>
+        <button type="button" class="melink" id="meOut">Sign out</button>
       </div>
       <div class="flex items-center justify-between gap-2">
         <span class="text-xs text-nav-muted">Theme</span>
@@ -368,17 +418,27 @@
             <h1>Settings</h1>
             <p>Keys and switches for the whole site. Saved values apply straight away and win over .env.</p>
           </div>
-          <button class="ghost" id="adminLock" type="button">Lock</button>
         </div>
-        <div class="panel">
-          <div id="slock">
-            <p class="hint">Enter the admin passcode (ADMIN_PASSCODE on the server) to view and change settings.</p>
-            <div class="row">
-              <label for="adminPass" class="sr-only">Admin passcode</label>
-              <input id="adminPass" type="password" autocomplete="off" placeholder="Admin passcode" class="sm:w-60">
-              <button class="primary" id="adminGo" type="button">Unlock</button>
-            </div>
+
+        <!-- People who can sign in, and what each may do -->
+        <div class="panel" id="users">
+          <div class="panel-head">
+            <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
+            <div class="min-w-0"><h2>People</h2><p>Viewer: sees everything, changes nothing. Editor: also sends to Jira and approves the Inbox. Admin: also Settings and these accounts.</p></div>
           </div>
+          <div class="scroll"><table id="utable"></table></div>
+          <h3 class="pvsec">Add someone</h3>
+          <div class="row tight mt-2">
+            <label for="uEmail" class="sr-only">Email</label><input id="uEmail" type="email" autocomplete="off" placeholder="Email" class="sm:w-64">
+            <label for="uName" class="sr-only">Name</label><input id="uName" autocomplete="off" placeholder="Name" class="sm:w-48">
+            <label for="uRole" class="sr-only">Role</label>
+            <select id="uRole" class="w-auto"><option value="viewer">Viewer</option><option value="editor" selected>Editor</option><option value="admin">Admin</option></select>
+            <button class="primary" id="uAdd" type="button">Add</button>
+          </div>
+          <div id="umsg" class="msg" role="status"></div>
+        </div>
+
+        <div class="panel">
           <div id="smsg" class="msg" role="status"></div>
 
           <div id="sform" hidden>
@@ -472,6 +532,37 @@
               <div id="sMakeOut" class="msg" role="status"></div>
             </div>
 
+            <h2 class="sset">Alerts</h2>
+            <p class="hint">Tell people when something needs them: a send to Jira failed, the portal sent a task with problems, the sheet sync stopped, a change waits for approval, or a daily summary.</p>
+            <div id="alChannels" class="mt-4 flex flex-col gap-3"></div>
+            <div class="row tight mt-3"><button class="ghost" id="alAdd" type="button">Add a channel</button></div>
+            <div class="grid mt-5">
+              <div class="full">
+                <label for="alUrl">Jira360 address <span class="opt">(alerts link to it)</span></label>
+                <input id="alUrl" type="url" spellcheck="false" placeholder="https://jira360.example.com">
+              </div>
+              <div>
+                <label for="alHour">Daily summary at</label>
+                <select id="alHour"></select>
+              </div>
+              <div>
+                <label for="alTz">Time zone</label>
+                <input id="alTz" spellcheck="false" placeholder="Asia/Kolkata" list="alTzList"><datalist id="alTzList"></datalist>
+              </div>
+            </div>
+            <details class="recent mt-4" id="alSmtpBox">
+              <summary>Email server (SMTP), for email channels</summary>
+              <div class="grid mt-3 mb-2">
+                <div><label for="alHost">Server</label><input id="alHost" spellcheck="false" placeholder="smtp.gmail.com"></div>
+                <div><label for="alPort">Port</label><input id="alPort" type="number" min="1" max="65535" placeholder="587"></div>
+                <div><label for="alUser">User name</label><input id="alUser" spellcheck="false" autocomplete="off"></div>
+                <div><label for="alPass">Password <span class="opt">(for Gmail: an app password)</span></label><input id="alPass" type="password" autocomplete="new-password"></div>
+                <div class="full"><label for="alFrom">From</label><input id="alFrom" spellcheck="false" placeholder="Jira360 &lt;alerts@example.com&gt;"></div>
+              </div>
+              <p class="mt-0 mb-1 text-sm text-muted">Email also needs the nodemailer package on the server: <code>npm install nodemailer</code>.</p>
+            </details>
+            <div id="alTestOut" class="msg" role="status"></div>
+
             <div class="formfoot">
               <button class="primary" id="sSave" type="button">Save settings</button>
               <span id="supdated" class="muted"></span>
@@ -498,6 +589,68 @@
           <div id="spvPlan" class="planlist"><p class="muted">Checking…</p></div>
           <h3 class="pvsec">Rows <span id="spvCount" class="opt normal-case tracking-normal"></span></h3>
           <div class="scroll"><table id="spvRows"></table></div>
+        </div>
+      </section>
+
+      <!-- Dashboard -->
+      <section id="dashPanel" role="tabpanel" aria-labelledby="tabDashboard" hidden>
+        <div class="pagehead pagehead--actions">
+          <div>
+            <p class="eyebrow">Reports</p>
+            <h1>Dashboard</h1>
+            <p id="dashSub">Open tickets, time logged and what Jira360 sent.</p>
+          </div>
+          <div class="flex flex-wrap items-center gap-2">
+            <div class="seg" role="group" aria-label="Period">
+              <button type="button" data-days="7" aria-pressed="true">7 days</button>
+              <button type="button" data-days="30" aria-pressed="false">30 days</button>
+            </div>
+            <button class="ghost" id="dashRefresh" type="button">Refresh</button>
+            <button class="ghost ai-only" id="dashAi" type="button">Write status update (AI)</button>
+          </div>
+        </div>
+        <div id="dashMsg" class="msg" role="status"></div>
+        <div class="panel mb-5" id="dashAiBox" hidden>
+          <div class="panel-head">
+            <div class="min-w-0"><h2>Status update</h2><p>Written by AI from the numbers below. Read it before you send it.</p></div>
+            <div class="actions"><button class="ghost" id="dashAiCopy" type="button">Copy</button></div>
+          </div>
+          <pre id="dashAiText" class="aitext"></pre>
+        </div>
+        <div id="dashKpis" class="kpis"></div>
+        <div class="dashgrid">
+          <div class="panel">
+            <div class="panel-head"><div class="min-w-0"><h2>Created and resolved</h2><p id="dashFlowSub">Tickets per day</p></div></div>
+            <div id="dashFlow"></div>
+          </div>
+          <div class="panel">
+            <div class="panel-head"><div class="min-w-0"><h2>Sent by Jira360</h2><p id="dashSendSub">Sends to Jira per day</p></div></div>
+            <div id="dashSends"></div>
+          </div>
+          <div class="panel">
+            <div class="panel-head"><div class="min-w-0"><h2>Open by status</h2><p>Click a bar to see those tickets in Jira</p></div></div>
+            <div id="dashStatus"></div>
+          </div>
+          <div class="panel">
+            <div class="panel-head"><div class="min-w-0"><h2>Open by assignee</h2><p>Who holds the open work</p></div></div>
+            <div id="dashAssignee"></div>
+          </div>
+          <div class="panel">
+            <div class="panel-head"><div class="min-w-0"><h2>Hours logged</h2><p id="dashHoursSub">Per person</p></div></div>
+            <div id="dashHours"></div>
+          </div>
+          <div class="panel">
+            <div class="panel-head"><div class="min-w-0"><h2>Open by priority</h2><p id="dashSprint"></p></div></div>
+            <div id="dashPriority"></div>
+          </div>
+          <div class="panel">
+            <div class="panel-head"><div class="min-w-0"><h2>Sends by person</h2><p>Successful sends to Jira from Jira360</p></div></div>
+            <div id="dashPeople"></div>
+          </div>
+          <div class="panel">
+            <div class="panel-head"><div class="min-w-0"><h2>Problems</h2><p id="dashSheet"></p></div></div>
+            <div id="dashErrors"></div>
+          </div>
         </div>
       </section>
 
@@ -601,9 +754,12 @@
 <script src="js/bulk.js"></script>
 <script src="js/inbox.js"></script>
 <script src="js/activity.js"></script>
+<script src="js/dashboard.js"></script>
 <script src="js/fields.js"></script>
 <script src="js/ai.js"></script>
 <script src="js/settings.js"></script>
+<script src="js/users.js"></script>
+<script src="js/alerts.js"></script>
 <script src="js/sheetpreview.js"></script>
 <script src="js/shell.js"></script>
 <script src="js/start.js"></script>

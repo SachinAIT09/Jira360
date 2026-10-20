@@ -122,17 +122,18 @@ function fcRow(key, name, kind, required, extra) {
   const shared = extra ? draftOrder.includes(key) && !fcHidden.has(key) : !fcHidden.has(key);
   const mine = myFieldPrefs()[key] || '';
   return `<tr data-key="${esc(key)}"><td>${esc(name)}${required ? ' <span class="muted">(required)</span>' : ''}</td><td class="muted">${esc(kind)}</td>` +
-    `<td><label class="switch"><input type="checkbox" data-shared ${shared || required ? 'checked' : ''} ${required ? 'disabled' : ''}><span>Shown</span></label></td>` +
+    `<td><label class="switch"><input type="checkbox" data-shared ${shared || required ? 'checked' : ''} ${required || !can('admin') ? 'disabled' : ''}><span>Shown</span></label></td>` +
     `<td><select data-mine ${required ? 'disabled' : ''} aria-label="Just for me: ${esc(name)}">` +
     `<option value=""${mine === '' ? ' selected' : ''}>Same as everyone</option><option value="show"${mine === 'show' ? ' selected' : ''}>Always show</option>` +
     `<option value="hide"${mine === 'hide' ? ' selected' : ''}>Always hide</option></select></td>` +
-    `<td>${extra ? '<button class="ghost" type="button" data-move="-1" aria-label="Move up">↑</button><button class="ghost" type="button" data-move="1" aria-label="Move down">↓</button>' : ''}</td></tr>`;
+    `<td>${extra && can('admin') ? '<button class="ghost" type="button" data-move="-1" aria-label="Move up">↑</button><button class="ghost" type="button" data-move="1" aria-label="Move down">↓</button>' : ''}</td></tr>`;
 }
 let fcHidden = new Set();
 function renderFieldDialog() {
   const extras = [...fieldInfo.extra].sort((a, b) => (draftOrder.indexOf(a.id) + 1 || 1e6) - (draftOrder.indexOf(b.id) + 1 || 1e6));
   $('fcBody').innerHTML =
-    '<p class="hint">"Shown" applies to everyone using this page (and to the Excel template). "Just for me" overrides it in this browser only.</p>' +
+    (can('admin') ? '<p class="hint">"Shown" applies to everyone using this page (and to the Excel template). "Just for me" overrides it in this browser only.</p>'
+      : '<p class="hint">"Everyone" is what an admin chose for everyone. "Just for me" changes it in this browser only.</p>') +
     '<div class="scroll"><table class="fctable"><tr><th>Field</th><th>Type</th><th>Everyone</th><th>Just for me</th><th><span class="sr-only">Order</span></th></tr>' +
     `<tr><th colspan="5" class="pvsec">More Jira fields (${extras.length})</th></tr>` +
     (extras.length ? extras.map(f => fcRow(f.id, f.name, KIND_NAMES[f.kind] || f.kind, f.required, true)).join('') : '<tr><td colspan="5" class="empty">No other fields.</td></tr>') +

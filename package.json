@@ -11,7 +11,8 @@
   "scripts": {
     "start": "node --env-file=.env server.js",
     "build:css": "tailwindcss -i src/styles.css -o public/app.css --minify",
-    "watch:css": "tailwindcss -i src/styles.css -o public/app.css --watch"
+    "watch:css": "tailwindcss -i src/styles.css -o public/app.css --watch",
+    "test": "node --test test/*.test.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.135.0",

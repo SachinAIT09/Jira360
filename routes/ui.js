@@ -1,49 +1,33 @@
-// HTML form routes (page served by server.js locally, by Netlify when hosted). All need the passcode.
+// HTML form routes (page served by server.js locally, by Netlify when hosted). All need someone
+// signed in (routes/auth.js), with the role each one names: viewer < editor < admin.
 
-import crypto from 'node:crypto';
 import express from 'express';
-import { JIRA_ISSUE_TYPE, JIRA_PROJECT_KEY, UI_PASSCODE } from '../lib/config.js';
-import { effective, settingsForPage, saveSettings, adminPasscode } from '../lib/settings.js';
+import { JIRA_ISSUE_TYPE, JIRA_PROJECT_KEY } from '../lib/config.js';
+import { effective, settingsForPage, saveSettings } from '../lib/settings.js';
+import { need, userOf } from '../lib/auth.js';
 import { jira, lists, readIssue, browseUrl } from '../lib/jira.js';
 import { findIssue } from '../lib/sync.js';
 import { syncAndRecord, listActivity, taskActivity } from '../lib/activity.js';
 import { checkTask, previewContext } from '../lib/check.js';
 import { readBulkFile, mapLimit, CHECK_CHUNK } from '../lib/bulk.js';
 import { listInbox, approve, reject } from '../lib/inbox.js';
-import { pollSheet, sheetStatus, createSheet, setupSheet, sheetPreview } from '../lib/sheet.js';
+import { pollSheet, syncFailed, sheetStatus, createSheet, setupSheet, sheetPreview } from '../lib/sheet.js';
 import { templateXlsx } from '../lib/sheet-layout.js';
 import { fieldsForPage, setFieldConfig } from '../lib/fields.js';
 import { log, logError, fail, sendError } from '../lib/log.js';
-import { aiStatus, testAi, draftTicket, rewriteTicket, similarTickets, suggestRowFixes, summarizeChanges } from '../lib/ai.js';
+import { aiStatus, testAi, draftTicket, rewriteTicket, similarTickets, suggestRowFixes, summarizeChanges, weeklyReport } from '../lib/ai.js';
+import { dashboard } from '../lib/dashboard.js';
+import { testChannel } from '../lib/alerts.js';
 import { readSheet, sheetInfo } from '../lib/google.js';
 
 const router = express.Router();
 export default router;
 
-// Who is using the page, as typed in its "Your name" box (the passcode is shared, so this is a
-// name for the history, not a login). Sent URI-encoded so any language works in a header.
-function userOf(req) {
-  try { return decodeURIComponent(req.get('X-User-Name') || '').trim().slice(0, 80); } catch { return ''; }
-}
-
-// Passcodes are optional on this computer: an empty UI_PASSCODE / ADMIN_PASSCODE means none is asked.
-// On Netlify the site is public, so there they stay required.
-export const onNetlify = !!(process.env.NETLIFY || process.env.AWS_LAMBDA_FUNCTION_NAME);
-
-// Which passcodes the page has to ask for (no passcode needed to ask)
-router.get('/ui/auth', (_req, res) => res.json({ passcode: !!UI_PASSCODE || onNetlify, admin: !!adminPasscode() || onNetlify }));
-
-function uiAuth(req, res, next) {
-  if (!UI_PASSCODE) return onNetlify ? fail(res, 503, 'not_configured', 'Form disabled: set UI_PASSCODE on the server (required on Netlify)') : next();
-  const given = req.get('X-UI-Passcode') || '';
-  if (given.length !== UI_PASSCODE.length || !crypto.timingSafeEqual(Buffer.from(given), Buffer.from(UI_PASSCODE)))
-    return fail(res, 401, 'unauthorized', 'Wrong passcode');
-  next();
-}
+const viewer = need('viewer'), editor = need('editor'), admin = need('admin');
 
 // Everything the form's pickers offer, read from Jira. A list that fails comes back empty and is
 // named in "failed", so the page can still be used for the rest.
-router.get('/ui/options', uiAuth, async (_req, res) => {
+router.get('/ui/options', viewer, async (_req, res) => {
   const p = JIRA_PROJECT_KEY, failed = [];
   const get = (name, promise, fallback) => promise.catch(e => { failed.push(name); logError('ui', e, { list: name }); return fallback; });
   const [sprints, versions, priorities, users, parents, statuses, labels] = await Promise.all([
@@ -55,7 +39,7 @@ router.get('/ui/options', uiAuth, async (_req, res) => {
 });
 
 // Current Jira values for the form, keyed by the form's field names (polled by the page)
-router.get('/ui/issue', uiAuth, async (req, res) => {
+router.get('/ui/issue', viewer, async (req, res) => {
   const { jiraKey, taskId } = req.query;
   if (!jiraKey && !taskId) return fail(res, 400, 'invalid', 'Give a Jira key or task ID');
   try {
@@ -72,12 +56,12 @@ router.get('/ui/issue', uiAuth, async (req, res) => {
 });
 
 // ---------- Preview before sending (single form and bulk upload) ----------
-router.post('/ui/preview', uiAuth, async (req, res) => {
+router.post('/ui/preview', viewer, async (req, res) => {
   res.json(await checkTask(req.body || {}, previewContext(), { withCurrent: true }));
 });
 
 // Bulk step 1: read the file and find duplicates inside it. No Jira calls, so it is quick.
-router.post('/ui/bulk/parse', uiAuth, express.raw({ type: () => true, limit: '5mb' }), async (req, res) => {
+router.post('/ui/bulk/parse', editor, express.raw({ type: () => true, limit: '5mb' }), async (req, res) => {
   const buf = req.body;
   if (!Buffer.isBuffer(buf) || !buf.length) return fail(res, 400, 'invalid', 'No file received');
   try {
@@ -89,7 +73,7 @@ router.post('/ui/bulk/parse', uiAuth, express.raw({ type: () => true, limit: '5m
 
 // Bulk step 2: check a few rows against Jira. The page sends the file's rows in chunks so each
 // request stays well inside Netlify's ~10 second limit.
-router.post('/ui/bulk/check', uiAuth, async (req, res) => {
+router.post('/ui/bulk/check', editor, async (req, res) => {
   const rows = req.body?.rows;
   if (!Array.isArray(rows) || !rows.length || rows.length > CHECK_CHUNK)
     return fail(res, 400, 'invalid', `Send 1 to ${CHECK_CHUNK} rows at a time`);
@@ -98,7 +82,7 @@ router.post('/ui/bulk/check', uiAuth, async (req, res) => {
 });
 
 // The page says which of its screens sent the task, for the logs
-router.post('/ui/task', uiAuth, async (req, res) => {
+router.post('/ui/task', editor, async (req, res) => {
   const task = req.body || {};
   const source = req.get('X-Source') === 'bulk' ? 'bulk' : 'ui';
   if (!task.taskId) return fail(res, 400, 'invalid', 'Task ID is required');
@@ -114,7 +98,7 @@ router.post('/ui/task', uiAuth, async (req, res) => {
 // ---------- Inbox: changes waiting for approval (portal now, Google Sheet later) ----------
 const withUrl = item => item.result?.jiraKey ? { ...item, result: { ...item.result, url: browseUrl(item.result.jiraKey) } } : item;
 
-router.get('/ui/inbox', uiAuth, async (_req, res) => {
+router.get('/ui/inbox', viewer, async (_req, res) => {
   try {
     const { pending, decided } = await listInbox();
     res.json({ approvalMode: effective().portal.requireApproval, pending, decided: decided.map(withUrl), sheet: await sheetStatus() });
@@ -126,7 +110,7 @@ router.get('/ui/inbox', uiAuth, async (_req, res) => {
 // Who decided: the page's name box (older pages sent it in the body)
 const decidedBy = req => userOf(req) || String(req.body?.by || '').trim().slice(0, 80);
 
-router.post('/ui/inbox/:id/approve', uiAuth, async (req, res) => {
+router.post('/ui/inbox/:id/approve', editor, async (req, res) => {
   try {
     const item = await approve(req.params.id, decidedBy(req), { keepJira: req.body?.keepJira });
     log('inbox', { approved: item.id, by: item.decidedBy, ...item.result });
@@ -138,7 +122,7 @@ router.post('/ui/inbox/:id/approve', uiAuth, async (req, res) => {
   }
 });
 
-router.post('/ui/inbox/:id/reject', uiAuth, async (req, res) => {
+router.post('/ui/inbox/:id/reject', editor, async (req, res) => {
   try {
     const item = await reject(req.params.id, decidedBy(req), String(req.body?.reason || '').trim().slice(0, 500));
     log('inbox', { rejected: item.id, by: item.decidedBy, taskId: item.task.taskId });
@@ -152,7 +136,7 @@ router.post('/ui/inbox/:id/reject', uiAuth, async (req, res) => {
 // ---------- Activity: history of every send to Jira ----------
 const dayStart = v => (/^\d+$/.test(String(v || '')) ? Number(v) : 0); // the page sends local day bounds in ms
 
-router.get('/ui/activity', uiAuth, async (req, res) => {
+router.get('/ui/activity', viewer, async (req, res) => {
   const { q, source, result, from, to, before, limit } = req.query;
   try {
     res.json(await listActivity({ q, source, result, from: dayStart(from), to: dayStart(to), before, limit }));
@@ -161,7 +145,7 @@ router.get('/ui/activity', uiAuth, async (req, res) => {
   }
 });
 
-router.get('/ui/activity/task', uiAuth, async (req, res) => {
+router.get('/ui/activity/task', viewer, async (req, res) => {
   const { taskId, jiraKey } = req.query;
   if (!taskId && !jiraKey) return fail(res, 400, 'invalid', 'Give a task ID or Jira key');
   try {
@@ -173,7 +157,7 @@ router.get('/ui/activity/task', uiAuth, async (req, res) => {
 
 // ---------- AI suggestions (never sent to Jira from here: the page shows them, the person decides) ----------
 function aiRoute(path, fn) {
-  router.post(path, uiAuth, async (req, res) => {
+  router.post(path, editor, async (req, res) => {
     try {
       res.json(await fn(req.body || {}));
     } catch (e) {
@@ -187,20 +171,28 @@ aiRoute('/ui/ai/rewrite', b => rewriteTicket(b));
 aiRoute('/ui/ai/similar', b => similarTickets(b));
 aiRoute('/ui/ai/fix-rows', b => suggestRowFixes(b.rows));
 aiRoute('/ui/ai/summarize', async () => summarizeChanges((await listInbox()).pending));
+aiRoute('/ui/ai/report', b => dashboard({ days: b.days, tz: b.tz }).then(weeklyReport));
+
+// ---------- Dashboard: open tickets, hours logged, and what Jira360 sent, for 7 or 30 days ----------
+router.get('/ui/dashboard', viewer, async (req, res) => {
+  try { res.json(await dashboard({ days: req.query.days, tz: req.query.tz })); }
+  catch (e) { sendError(res, e, 'dashboard'); }
+});
 
 // ---------- Google Sheet: check it for new / changed rows now (they go to the Inbox) ----------
-router.post('/ui/sheet/check', uiAuth, async (_req, res) => {
+router.post('/ui/sheet/check', editor, async (_req, res) => {
   try {
     res.json(await pollSheet());
   } catch (e) {
     if (e.status === 400 || e.status === 503) return fail(res, e.status, e.status === 400 ? 'invalid' : 'not_configured', e.message);
     logError('sheet', e);
+    await syncFailed(e);
     fail(res, 502, 'sheet_error', e.message);
   }
 });
 
 // ---------- Fields: every field Jira has for the project, and which ones the form shows ----------
-router.get('/ui/fields', uiAuth, async (_req, res) => {
+router.get('/ui/fields', viewer, async (_req, res) => {
   try {
     res.json(await fieldsForPage());
   } catch (e) {
@@ -209,7 +201,7 @@ router.get('/ui/fields', uiAuth, async (_req, res) => {
 });
 
 // The shared setting (everyone sees it); people can also show / hide fields just for themselves in the page
-router.post('/ui/fields/config', uiAuth, async (req, res) => {
+router.post('/ui/fields/config', admin, async (req, res) => {
   try {
     const saved = await setFieldConfig(req.body || {}, userOf(req));
     log('fields', { config: saved });
@@ -219,29 +211,10 @@ router.post('/ui/fields/config', uiAuth, async (req, res) => {
   }
 });
 
-// ---------- Settings (keys and switches): admin passcode only ----------
-// Wrong guesses are slowed down, and an address that keeps guessing is locked out for 10 minutes.
-const adminFails = new Map(); // ip -> { n, until }
-async function adminAuth(req, res, next) {
-  const admin = adminPasscode();
-  if (!admin) return onNetlify ? fail(res, 503, 'not_configured', 'Settings are locked: set ADMIN_PASSCODE on the server (required on Netlify)') : next();
-  const ip = req.ip || 'x', f = adminFails.get(ip);
-  if (f?.until > Date.now()) return fail(res, 429, 'locked', 'Too many wrong admin passcodes; try again in 10 minutes');
-  const given = req.get('X-Admin-Passcode') || '';
-  if (given.length !== admin.length || !crypto.timingSafeEqual(Buffer.from(given), Buffer.from(admin))) {
-    const n = (f?.n || 0) + 1;
-    adminFails.set(ip, { n, until: n >= 10 ? Date.now() + 600000 : 0 });
-    await new Promise(r => setTimeout(r, 600));
-    log('settings', { wrongAdminPasscode: ip, attempts: n });
-    return fail(res, 401, 'unauthorized', 'Wrong admin passcode');
-  }
-  adminFails.delete(ip);
-  next();
-}
+// ---------- Settings (keys and switches): admins only ----------
+router.get('/ui/settings', admin, (_req, res) => res.json(settingsForPage()));
 
-router.get('/ui/settings', uiAuth, adminAuth, (_req, res) => res.json(settingsForPage()));
-
-router.post('/ui/settings', uiAuth, adminAuth, async (req, res) => {
+router.post('/ui/settings', admin, async (req, res) => {
   try {
     const out = await saveSettings(req.body || {}, userOf(req));
     log('settings', { savedBy: userOf(req), changed: Object.keys(req.body || {}) }); // never the values
@@ -253,11 +226,15 @@ router.post('/ui/settings', uiAuth, adminAuth, async (req, res) => {
 });
 
 // "Test" buttons: check what is saved, without changing anything
-router.post('/ui/settings/test-ai', uiAuth, adminAuth, async (_req, res) => {
+router.post('/ui/settings/test-ai', admin, async (_req, res) => {
   try { res.json(await testAi()); }
   catch (e) { fail(res, e.status || 502, 'ai_test_failed', e.message); }
 });
-router.post('/ui/settings/test-sheet', uiAuth, adminAuth, async (_req, res) => {
+router.post('/ui/settings/test-alert', admin, async (req, res) => {
+  try { res.json(await testChannel(String(req.body?.id || ''))); }
+  catch (e) { fail(res, e.status === 400 ? 400 : 502, 'alert_test_failed', e.message); }
+});
+router.post('/ui/settings/test-sheet', admin, async (_req, res) => {
   try {
     const grid = await readSheet();
     const header = grid.find(r => r.some(c => String(c).trim())) || [];
@@ -273,18 +250,18 @@ const sheetFail = (res, e) => {
   logError('sheet', e);
   fail(res, 502, 'sheet_error', e.message);
 };
-router.post('/ui/sheet/create', uiAuth, adminAuth, async (req, res) => {
+router.post('/ui/sheet/create', admin, async (req, res) => {
   try { res.json(await createSheet({ title: req.body?.title, shareWith: String(req.body?.shareWith || '').trim(), by: userOf(req) })); }
   catch (e) { sheetFail(res, e); }
 });
-router.post('/ui/sheet/setup', uiAuth, adminAuth, async (_req, res) => {
+router.post('/ui/sheet/setup', admin, async (_req, res) => {
   try { res.json(await setupSheet()); } catch (e) { sheetFail(res, e); }
 });
-router.get('/ui/sheet/preview', uiAuth, adminAuth, async (req, res) => {
+router.get('/ui/sheet/preview', admin, async (req, res) => {
   try { res.json(await sheetPreview({ plan: req.query.plan === '1' })); } catch (e) { sheetFail(res, e); }
 });
 // The layout as an .xlsx, with Jira's dropdowns (File -> Import in Google Sheets)
-router.get('/ui/sheet/template.xlsx', uiAuth, async (_req, res) => {
+router.get('/ui/sheet/template.xlsx', viewer, async (_req, res) => {
   try {
     const buf = await templateXlsx();
     res.set({ 'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'Content-Disposition': 'attachment; filename="jira360-sheet-template.xlsx"' });

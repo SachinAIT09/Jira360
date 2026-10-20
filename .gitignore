@@ -5,3 +5,7 @@ node_modules/
 *.zip
 data/
 Jira360/
+
+# Google service account keys and other private keys
+*-key.json
+*.pem

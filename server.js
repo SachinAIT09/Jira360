@@ -6,6 +6,7 @@ import express from 'express';
 import app, { missingEnv, whoAmI } from './app.js';
 import { enableSheetTimer } from './lib/sheet.js';
 import { refreshSettings } from './lib/settings.js';
+import { runDigestIfDue } from './lib/alerts.js';
 
 const { PORT = 8080, HOST = '127.0.0.1' } = process.env; // HOST 0.0.0.0 lets others on the network open the form
 
@@ -23,11 +24,9 @@ app.use(express.static(fileURLToPath(new URL('./public/', import.meta.url)), {
   setHeaders: res => res.setHeader('Cache-Control', 'no-cache'),
 }));
 
-// Without passcodes anyone who can open the page can send to Jira (and change Settings)
-if (!process.env.UI_PASSCODE || !process.env.ADMIN_PASSCODE) {
-  const open = [!process.env.UI_PASSCODE && 'the page', !process.env.ADMIN_PASSCODE && 'Settings'].filter(Boolean).join(' and ');
-  console.warn(`No passcode for ${open}` + (HOST === '127.0.0.1' || HOST === 'localhost' ? ' (only this computer can open it)' : `: anyone on your network can use ${open} at port ${PORT}`));
-}
+// Accounts: until the first admin is made, the page asks for it (with ADMIN_PASSCODE as the setup code, if set)
+if (!process.env.ADMIN_PASSCODE && HOST !== '127.0.0.1' && HOST !== 'localhost')
+  console.warn(`No ADMIN_PASSCODE: until the first admin account exists, anyone on your network can create it at port ${PORT}`);
 
 app.listen(PORT, HOST, async () => {
   try { await whoAmI(); } catch (e) { console.error('Jira auth check failed:', e.message); }
@@ -37,3 +36,6 @@ app.listen(PORT, HOST, async () => {
 // Settings saved in the page (keys, sheet), then the Google Sheet timer, which follows them
 await refreshSettings(true);
 enableSheetTimer();
+// Alerts' daily summary: checked every hour, sent once a day at the hour set in Settings
+setInterval(() => runDigestIfDue().catch(e => console.error('daily summary failed:', e.message)), 3600000);
+runDigestIfDue().catch(e => console.error('daily summary failed:', e.message));

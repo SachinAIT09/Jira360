@@ -17,12 +17,13 @@ document.addEventListener('keydown', e => {
 });
 wideScreen.addEventListener('change', () => setNav(false));
 
-// Picking a section closes the drawer and starts at the top; the overview isn't shown in Settings
+// Picking a section closes the drawer and starts at the top; the overview isn't shown in Settings or the Dashboard
 const showTabBase = showTab;
 showTab = function (name, how) {
   showTabBase(name, how);
-  $('stats').hidden = name === 'settings';
-  if (name !== 'settings') { loadOverview(); if (name !== 'inbox') loadInbox(); } // the sheet sync may have sent things meanwhile
+  name = Object.keys(TABS).find(k => !$(TABS[k][1]).hidden) || name; // where it went (a role may have redirected it)
+  $('stats').hidden = name === 'settings' || name === 'dashboard';
+  if (name !== 'settings' && name !== 'dashboard') { loadOverview(); if (name !== 'inbox') loadInbox(); } // the sheet sync may have sent things meanwhile
   if (document.body.classList.contains('nav-open')) setNav(false);
   window.scrollTo({ top: 0 });
 };

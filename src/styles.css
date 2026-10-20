@@ -50,6 +50,7 @@
   --accent-soft: #efedff;
   --accent-text: #4636bf;
   --accent-2: #2f6bff;      /* second brand colour: gradients, charts */
+  --series-1: #2a78d6;  --series-2: #eb6834;  /* two-series charts (validated for colour-blind readers) */
   --ring: rgb(91 75 219 / .32);
   --ok: #067647;   --ok-bg: #ecfdf3;   --ok-border: #abefc6;
   --warn: #93370d; --warn-bg: #fffaeb; --warn-border: #fedf89;
@@ -86,6 +87,7 @@
   --accent-soft: #221f4d;
   --accent-text: #b4abff;
   --accent-2: #6f9bff;
+  --series-1: #3987e5;  --series-2: #d95926;
   --ring: rgb(145 132 255 / .42);
   --ok: #6ee7a8;   --ok-bg: #0e2a1f;   --ok-border: #1d4d37;
   --warn: #f7c568; --warn-bg: #2b2111; --warn-border: #5a4419;
@@ -561,4 +563,84 @@
   .tag-grey { @apply bg-surface-2 text-muted; }
   #spvRows td.wrap { @apply max-w-[22rem] min-w-[12rem] whitespace-normal; }
   #spvRows tr.bad td { background: color-mix(in srgb, var(--err-bg) 70%, transparent); }
+}
+
+/* Sign-in screen, the signed-in person in the sidebar, and what each role sees */
+@layer components {
+  .gate { @apply grid min-h-dvh place-items-center px-4 py-10; background: var(--hero), var(--bg); }
+  .gatecard { @apply w-full max-w-sm rounded-lg border border-border bg-surface p-6 shadow-card sm:p-7; }
+  .gatecard form { @apply mt-6 flex flex-col gap-4; }
+  .gatecard h1 { @apply m-0 text-xl font-semibold; }
+  .gatecard .hint { @apply -mt-2 text-sm; }
+  .mebox { @apply flex items-center gap-2.5; }
+  .meavatar { @apply grid size-8 shrink-0 place-items-center rounded-full text-sm font-semibold text-white; background: linear-gradient(135deg, #7c6cff, #2f6bff); }
+  .mename { @apply m-0 truncate text-sm font-medium text-white; }
+  .merole { @apply m-0 truncate text-xs text-nav-muted; }
+  .melink { @apply cursor-pointer border-0 bg-transparent p-0 text-xs text-nav-muted underline-offset-2; }
+  .melink:hover { @apply text-white underline; }
+  /* The server refuses these anyway; the page just doesn't offer them */
+  body:not([data-role=admin]) :is(#tabSettings, #fcSave) { display: none !important; }
+  body[data-role=viewer] :is(#tabBulk, #go, #aiDraftBtn, #aiRewriteBtn, #isheetCheck, #isum, [data-act], [data-retry]) { display: none !important; }
+}
+
+/* Dashboard: tiles, ranked bars, per-day columns */
+@layer components {
+  .msg.warn { @apply block border-warn/40 bg-warn-bg text-warn; }
+  .seg { @apply inline-flex rounded-md border border-border-strong bg-surface p-0.5 shadow-xs; }
+  .seg button { @apply rounded-[5px] border-0 bg-transparent px-3 py-1.5 text-sm font-medium text-fg-2; }
+  .seg button[aria-pressed=true] { @apply bg-accent-soft text-accent-text; }
+  .kpis { @apply mb-5 grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 xl:grid-cols-6; }
+  .kpi { @apply flex min-w-0 flex-col rounded-lg border border-border bg-surface p-3.5 text-fg no-underline shadow-card sm:p-4; }
+  a.kpi, .kpi.clickable { @apply cursor-pointer; transition: border-color .15s; }
+  a.kpi:hover, .kpi.clickable:hover { @apply border-accent/40; }
+  .kpi-label { @apply text-xs font-medium text-muted; }
+  .kpi-value { @apply mt-1 text-2xl leading-8 font-semibold; }
+  .kpi-sub { @apply mt-0.5 truncate text-xs text-muted; }
+  .kpi.bad { box-shadow: inset 3px 0 0 var(--err), var(--shadow-md); }
+  .kpi.warn { box-shadow: inset 3px 0 0 var(--warn), var(--shadow-md); }
+  .dashgrid { @apply grid grid-cols-[minmax(0,1fr)] gap-5 lg:grid-cols-2; }
+  .dashgrid > .panel { @apply mt-0 min-w-0; }
+  .dashgrid .panel-head { @apply mb-4; }
+
+  .hbars { @apply m-0 flex list-none flex-col gap-1 p-0; }
+  .hbars li > * { @apply grid grid-cols-[minmax(5rem,11rem)_minmax(0,1fr)_3.5rem] items-center gap-3 rounded-md px-1.5 py-1 text-sm text-fg no-underline; }
+  .hbars a:hover { @apply bg-surface-2; }
+  .hb-name { @apply truncate text-fg-2; }
+  .hb-track { @apply block h-3; }
+  .hb-bar { @apply block h-full rounded-r-[4px] bg-accent; }
+  .hb-bar.other { @apply bg-border-strong; }
+  .hb-val { @apply text-right text-fg-2 tabular-nums; }
+
+  .legend { @apply mb-3 flex flex-wrap gap-x-4 gap-y-1 text-sm text-fg-2; }
+  .legend span { @apply inline-flex items-center gap-1.5; }
+  .sw { @apply inline-block size-2.5 rounded-[3px]; }
+  .s1 { background: var(--series-1); }
+  .s2 { background: var(--series-2); }
+  .cbar.ok, .sw.ok { background: var(--ok); }
+  .cbar.bad, .sw.bad { background: var(--err); }
+  .cchart { @apply relative pl-8; }
+  .cgrid { @apply pointer-events-none absolute inset-x-0 top-0 flex h-44 flex-col justify-between; }
+  .cgrid span { @apply relative block border-t border-border; }
+  .cgrid span::before { content: attr(data-v); @apply absolute -top-2 left-0 text-2xs leading-none text-muted tabular-nums; }
+  .ccols { @apply relative flex h-44 items-stretch; }
+  .ccol { @apply flex min-w-0 flex-1 items-end justify-center gap-[2px] rounded-t-sm px-[1px] outline-none; }
+  .ccol:hover, .ccol:focus-visible { background: color-mix(in srgb, var(--accent-soft) 70%, transparent); }
+  .cbar { @apply block w-full max-w-6 rounded-t-[4px]; }
+  .ccols.stacked .cstack { @apply flex h-full w-full max-w-6 flex-col-reverse justify-start gap-[2px]; }
+  .ccols.stacked .cbar { @apply max-w-none rounded-none; }
+  .ccols.stacked .cbar:last-child { @apply rounded-t-[4px]; }
+  .cx { @apply mt-1.5 flex; }
+  .cx span { @apply min-w-0 flex-1 overflow-visible text-center text-2xs whitespace-nowrap text-muted; }
+  .ctip { @apply pointer-events-none absolute -top-9 z-10 rounded-md border border-border bg-surface px-2.5 py-1.5 text-xs whitespace-nowrap text-fg shadow-card; }
+  td.num, th.num { @apply text-right tabular-nums; }
+  .errlist { @apply m-0 flex list-none flex-col gap-2 p-0 text-sm; }
+  .errlist li { @apply flex items-start gap-2 [overflow-wrap:anywhere]; }
+  .aitext { @apply m-0 font-sans text-base whitespace-pre-wrap text-fg; }
+  body[data-role=viewer] #dashAi { display: none !important; }
+}
+
+/* Settings → Alerts: one card per channel */
+@layer components {
+  .alch { @apply rounded-lg border border-border bg-surface-2/50 p-3.5 sm:p-4; }
+  .alev { @apply m-0 mt-3 flex min-w-0 flex-wrap gap-x-4 gap-y-1.5 border-0 p-0 text-sm; }
 }

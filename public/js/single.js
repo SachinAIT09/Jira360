@@ -35,7 +35,8 @@ function forgetTicket() {
 
 async function pullFromJira() {
   const jiraKey = $('jiraKey').value.trim(), taskId = $('taskId').value.trim();
-  if (!passOk() || (!jiraKey && !taskId)) { forgetTicket(); setSync(''); return; }
+  if (!passOk()) return; // signed out: keep the ticket and any unsent edits for after signing in
+  if (!jiraKey && !taskId) { forgetTicket(); setSync(''); return; }
   if (busy) return;
   busy = true;
   // The key or task ID may change while a request is out; such answers are ignored
@@ -160,6 +161,7 @@ let pendingFrom = '';   // 'activity' when the preview was opened by Retry there
 $('f').addEventListener('submit', async e => {
   e.preventDefault();
   if (!needPass(show)) return;
+  if (!can('editor')) return show('err', 'Your role (viewer) can look at tickets but not send them.');
   // A tag typed but not yet confirmed with Enter still counts
   for (const k of Object.keys(pickers)) if ($(k + 'Input').value.trim()) $(k + 'Input').dispatchEvent(new Event('blur'));
   const data = {};

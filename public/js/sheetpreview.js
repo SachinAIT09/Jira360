@@ -4,7 +4,7 @@
 
 let spv = { data: null, busy: false, ticks: 0 };
 const sheetReady = () => !!(settings?.sheet?.hasKey && settings?.sheet?.sheetId);
-const previewOn = () => !$('settingsPanel').hidden && !$('sform').hidden && document.visibilityState === 'visible';
+const previewOn = () => passOk() && can('admin') && !$('settingsPanel').hidden && !$('sform').hidden && document.visibilityState === 'visible';
 function smake(kind, html) { const m = $('sMakeOut'); m.className = 'msg ' + kind; m.innerHTML = html; }
 function spvMsg(kind, html) { const m = $('spvMsg'); m.className = kind ? 'msg ' + kind : 'msg'; m.innerHTML = html || ''; }
 try { $('sShareWith').value = localStorage.getItem('jira.shareWith') || ''; } catch {}
@@ -23,11 +23,9 @@ async function loadPreview(withPlan = false) {
     renderPreview();
     if ($('spvMsg').classList.contains('err')) spvMsg('');
   } catch (err) {
-    // The admin passcode was changed elsewhere (or too many tries): lock Settings, so the refresh
-    // stops instead of counting as wrong passcodes every 15 s
-    if (err.status === 401 || err.status === 429) {
-      if (err.status === 401) adminStore.set('');
-      settings = null; $('sform').hidden = true; $('slock').hidden = !auth.admin; $('spv').hidden = true;
+    // Signed out or no longer an admin: hide Settings, so the refresh stops
+    if (err.status === 401 || err.status === 403) {
+      settings = null; $('sform').hidden = true; $('spv').hidden = true;
       sshow('err', esc(err.message));
       return;
     }
@@ -139,7 +137,7 @@ $('spvMissing').addEventListener('click', e => { if (e.target.closest('[data-set
 
 $('sTemplate').addEventListener('click', async () => {
   try {
-    const res = await fetch('ui/sheet/template.xlsx', { headers: { 'X-UI-Passcode': $('passcode').value, 'X-User-Name': encodeURIComponent($('who').value.trim()) } });
+    const res = await fetch('ui/sheet/template.xlsx', { credentials: 'same-origin' });
     if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || `HTTP ${res.status}`);
     const a = document.createElement('a');
     a.href = URL.createObjectURL(await res.blob());

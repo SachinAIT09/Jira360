@@ -37,7 +37,11 @@ Files:
 | `lib/fields.js` | Jira's field list for the project, and which fields the form shows |
 | `lib/ai.js` | AI suggestions (optional) |
 | `lib/google.js`, `lib/sheet.js`, `lib/sheet-layout.js` | Google Sheet sync, making the sheet, and its preview (optional) |
-| `routes/` | The web addresses: `ui.js` (the page), `portal.js` (the portal), `jira.js` (Jira webhook) |
+| `lib/users.js`, `lib/auth.js`, `routes/auth.js` | Accounts and roles, who is signed in, signing in and out |
+| `lib/dashboard.js` | The Dashboard's numbers |
+| `lib/alerts.js`, `netlify/functions/digest.mjs` | Alerts (Slack, Teams, webhook, email) and the daily summary on Netlify |
+| `test/` | Tests (`npm test`) |
+| `routes/` | The web addresses: `ui.js` (the page), `auth.js` (signing in, accounts), `portal.js` (the portal), `jira.js` (Jira webhook) |
 | `server.js` | Runs `app.js` on your computer (`npm start`) |
 | `netlify/functions/api.mjs`, `netlify.toml` | Runs `app.js` on Netlify |
 
@@ -136,13 +140,67 @@ The **Settings** tab sets the keys and switches without editing `.env` or restar
 - **Portal**: whether portal changes wait in the Inbox for approval.
 - **AI**: on/off, the Anthropic API key, the model, and the daily request limit. **Test the key** checks it with Anthropic without using a request.
 - **Google Sheet**: the service account key (paste the downloaded .json), the sheet's address, the tab, and how often to check it. The page shows which email to share the sheet with. **Test the sheet** reads it once.
+- **People**: who can sign in, and their role.
+- **Alerts**: where alerts go and what they are about (see "Alerts").
 
-To keep it for admins only, set `ADMIN_PASSCODE` in `.env` (a different, longer one than `UI_PASSCODE`); after 10 wrong tries an address is locked out for 10 minutes.
+### Accounts and roles
 
-**Passcodes are optional on your computer.** Leave `UI_PASSCODE` and/or `ADMIN_PASSCODE` empty (or commented out) and the page doesn't ask for them; the server prints a warning at start if others on the network can reach it (`HOST=0.0.0.0`). On Netlify, where the page is public, both stay required.
+People sign in with their email and a password. Each has a role:
+
+| Role | Can |
+|---|---|
+| Viewer | See tickets, the Inbox, the Dashboard and Activity. Changes nothing. |
+| Editor | Also send to Jira (form, bulk upload, Activity retry), approve or reject the Inbox, sync the sheet now, use AI. |
+| Admin | Also Settings, the fields shown to everyone, making the sheet, and the accounts. |
+
+- **First admin.** While nobody has an account, the page asks to create the first admin. It asks for the **setup code**: the `ADMIN_PASSCODE` from `.env` (required on Netlify, so a stranger can't claim the site). Without `ADMIN_PASSCODE` on your computer, no code is asked.
+- **Adding people** (Settings → People): type their email, name and role. They get a **temporary password**, shown once, to give them privately. They choose their own at first sign-in (at least 10 characters).
+- **Reset password** gives a new temporary password. **Switch off** stops someone signing in; **Delete** removes the account (their Activity stays). Changing a role, resetting or switching off signs that person out everywhere. There is always at least one admin.
+- **Sign-in** lasts 12 hours (renewed while the page is used). After 10 wrong passwords an account is locked for 10 minutes. **Change password** (bottom of the menu) signs out your other browsers.
+- Activity records the signed-in person's name. Passwords are kept only as scrypt hashes in the store (`user:<email>`). The sign-in cookie is signed with `SESSION_SECRET`, or one made and kept in the store; changing `SESSION_SECRET` signs everyone out.
+- `UI_PASSCODE` is no longer used.
+
+### Dashboard
+
+The **Dashboard** tab (everyone) shows the last 7 or 30 days:
+- **Tiles**: open tickets (and how many are in the active sprint), overdue, unassigned, created vs resolved, hours logged, and what Jira360 sent (with failures).
+- **Created and resolved** and **Sent by Jira360**: one column per day. Hover or tab to a day for its numbers; **Show as table** lists them.
+- **Open by status / assignee / priority**: click a bar to open those tickets in Jira.
+- **Hours logged** per person, from Jira's worklogs (the first 100 tickets with work logged in the period).
+- **Sends by person** and **Problems**: the most common reasons sends failed, and the Google Sheet's last sync.
+- **Write status update (AI)** (editors, with AI on): a short update from these numbers, to copy into email or chat.
+
+Numbers come live from Jira and the Activity history, kept for 2 minutes; the tab refreshes every 2 minutes while open.
+
+### Alerts
+
+Settings → **Alerts** sends a message when something needs people:
+
+| Event | When |
+|---|---|
+| Send to Jira failed | A send from the form, bulk upload, portal, Google Sheet or an Inbox approval failed. |
+| Portal task refused | The portal sent a task with problems; nothing reached Jira. |
+| Sheet sync failed | The timed Google Sheet sync couldn't run. |
+| Waiting for approval | A change arrived in the Inbox. |
+| Daily summary | Once a day at the hour set: the last 24 hours' sends and failures, the Inbox, and open / overdue / unassigned tickets. |
+
+- **Channels**: add as many as needed. Each has a type, an address and the events it gets:
+  - **Slack**: an incoming webhook address (`https://hooks.slack.com/…`).
+  - **Microsoft Teams**: a Workflows webhook address ("Post to a channel when a webhook request is received").
+  - **Webhook**: any address; it receives JSON `{ event, title, text, items, url, at }`.
+  - **Email**: one or more addresses. Fill in **Email server (SMTP)** and run `npm install nodemailer` on the server.
+- Webhook addresses work like passwords: after saving, only their last 4 characters are shown.
+- **Send test** sends a test message to that channel (save first).
+- **Jira360 address**: alerts link to it.
+- The same alert is sent at most once every 15 minutes (a bulk upload failing 50 rows the same way sends one; a sheet sync queuing many rows sends one "waiting" alert), and at most 30 alerts per event go out per hour.
+- The daily summary runs every hour and sends once a day, at or after the hour set, in the time zone set. On your computer `npm start` runs it; on Netlify the scheduled function `netlify/functions/digest.mjs` does (run it by hand with `npx netlify-cli functions:invoke digest`). Sheet sync alerts need the timer, so on Netlify only the other events apply.
+- Defaults can also come from `.env`: `APP_URL`, `ALERT_DIGEST_HOUR`, `ALERT_TIMEZONE`, `SMTP_*` (see `env.example`).
+- On Netlify, email also needs `"nodemailer"` added to `external_node_modules` in `netlify.toml`.
+
+Only admins see the Settings tab (see "Accounts and roles").
 
 How values are used: a value saved in Settings wins over `.env`; **Remove saved key** goes back to the `.env` value. Each value is marked "set here", "from .env" or "default".
-Keys are kept on the server (in `data/` on your computer, in Netlify Blobs on Netlify, like `.env` they are stored as plain text, so keep that folder private) and are never sent back to the page, which shows only the last 4 characters. The admin passcode is remembered only until the browser tab is closed.
+Keys are kept on the server (in `data/` on your computer, in Netlify Blobs on Netlify, like `.env` they are stored as plain text, so keep that folder private) and are never sent back to the page, which shows only the last 4 characters.
 
 ### Styling (Tailwind CSS)
 
@@ -156,7 +214,7 @@ The page is styled with **Tailwind CSS v4** (`tailwindcss` and `@tailwindcss/cli
 ### Activity (history)
 
 The **Activity** tab lists everything sent to Jira from the form, bulk uploads, the portal and Inbox approvals. Everyone using the page sees the same history.
-- Each line shows when, where it came from, **who** (the "Your name" box next to the passcode), the task and ticket, and what happened. Failed sends are kept with their error.
+- Each line shows when, where it came from, **who** (the signed-in person), the task and ticket, and what happened. Failed sends are kept with their error.
 - **Search** by Task ID, Jira key, title or name. **Filter** by source, sent/failed and dates.
 - **Click a line** to see that task's full history, with each changed field's value **before → after**.
 - **Retry** on a failed line opens the normal review dialog, so the task is checked against Jira again before it is sent.
@@ -172,14 +230,18 @@ The server remembers which Jira ticket belongs to each task, which portal events
 
 Why it isn't a standalone .html file: Jira blocks API calls made directly from a web page, and the API token would be visible to anyone who opens the page. The page talks to `app.js`, which holds the token.
 
+### Tests
+
+`npm test` runs the tests in `test/` (accounts and roles, the Dashboard's numbers, alerts) against a throwaway store and a fake Jira: nothing real is called.
+
 ### Run it on your computer
 
 ```bash
-copy env.example .env     # Windows (cp on Mac/Linux); fill JIRA_* values and set UI_PASSCODE
+copy env.example .env     # Windows (cp on Mac/Linux); fill JIRA_* values and set ADMIN_PASSCODE
 npm install
 npm start
 ```
-Open `http://localhost:8080/`. To let others on the network use it, set `HOST=0.0.0.0` in `.env` and share `http://<your computer's IP>:8080/`.
+Open `http://localhost:8080/` and create the first admin. To let others on the network use it, set `HOST=0.0.0.0` in `.env` and share `http://<your computer's IP>:8080/`.
 
 ### Put it on Netlify
 
@@ -189,12 +251,13 @@ Dragging the folder onto Netlify does **not** work: it publishes the files but c
 npx netlify-cli login                  # opens the browser once
 npx netlify-cli link                   # pick the existing site
 npx netlify-cli env:import .env        # copies the settings to Netlify (the token is stored there, not in the site files)
-npx netlify-cli env:set UI_PASSCODE "<a long random passcode>"   # the site is public: don't reuse a short passcode
+npx netlify-cli env:set ADMIN_PASSCODE "<a long random code>"   # the setup code for the first admin
+npx netlify-cli env:set SESSION_SECRET "<a long random value>"  # signs the sign-in cookies
 npx netlify-cli deploy --prod
 ```
 After changing settings in Netlify, deploy again for them to take effect.
 
-The Netlify site is on the public internet: anyone who has the link and the passcode can create and change tickets as `JIRA_EMAIL`. Use a long random passcode and change it when people leave the team.
+The Netlify site is on the public internet: anyone with an account can create and change tickets as `JIRA_EMAIL`, so create the first admin straight after deploying, and switch off accounts when people leave the team.
 
 ### How duplicates are avoided
 

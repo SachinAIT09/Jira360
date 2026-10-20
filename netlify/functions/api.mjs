@@ -1,5 +1,5 @@
 // Netlify Function: runs the same app as server.js. netlify.toml sends /ui/*, /portal/*,
-// /jira/* and /health here. Settings (JIRA_*, UI_PASSCODE, ...) come from the site's
+// /jira/* and /health here. Settings (JIRA_*, ADMIN_PASSCODE, ...) come from the site's
 // environment variables in Netlify, not from a .env file.
 import serverless from 'serverless-http';
 import app from '../../app.js';
@@ -15,7 +15,7 @@ const run = serverless(app);
 export const handler = (event, context) => {
   if (blobs) {
     blobs.connectLambda(event); // this kind of function must hand each request's Blobs access over first
-    useStore(blobStore(blobs.getStore('jira360')));
+    useStore(blobStore(blobs.getStore({ name: 'jira360', consistency: 'strong' })));
   }
   return run(event, context);
 };

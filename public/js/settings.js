@@ -1,41 +1,26 @@
-// Settings tab (admin passcode): portal approval, AI key, Google Sheet. Keys are sent to the server
-// and never shown again: the page only gets a hint (last 4 characters) and where each value comes from.
+// Settings tab (admins): portal approval, AI key, Google Sheet, and the people who can sign in.
+// Keys are sent to the server and never shown again: the page only gets a hint (last 4 characters)
+// and where each value comes from.
 
-const adminStore = {
-  get: () => { try { return sessionStorage.getItem('jira.admin') || ''; } catch { return ''; } },
-  set: v => { try { v ? sessionStorage.setItem('jira.admin', v) : sessionStorage.removeItem('jira.admin'); } catch {} },
-};
 function sshow(kind, html) { const m = $('smsg'); m.className = 'msg ' + kind; m.innerHTML = html; }
-const adminApi = (path, opts = {}) => api(path, { ...opts, headers: { ...(opts.headers || {}), 'X-Admin-Passcode': $('adminPass').value } });
+const adminApi = api; // the server checks the signed-in person's role
 let settings = null;
 const SOURCE = { page: 'set here', env: 'from .env', default: 'default' };
 const src = v => `<span class="srctag">${SOURCE[v] || v}</span>`;
 
-$('adminPass').value = adminStore.get();
-const adminOk = () => !auth.admin || !!$('adminPass').value;
-async function loadSettings(fromButton = false) {
-  if (!passOk() || !adminOk()) {
-    $('sform').hidden = true;
-    // Opening the tab with nothing typed yet is normal; pressing Unlock without both passcodes gets told why
-    if (fromButton) sshow('err', !passOk() ? 'Enter the team passcode in the Passcode box at the top first.' : 'Enter the admin passcode.');
-    return;
-  }
+async function loadSettings() {
+  if (!passOk() || !can('admin')) { $('sform').hidden = true; return; }
+  loadUsers();
   try {
     settings = await adminApi('ui/settings');
-    adminStore.set($('adminPass').value); // for this browser tab only
+    if (/err/.test($('smsg').className)) $('smsg').className = 'msg';
     renderSettings();
     $('sform').hidden = false;
-    $('slock').hidden = true;
-    $('adminLock').hidden = !auth.admin; // nothing to lock without an admin passcode
   } catch (err) {
-    $('sform').hidden = true; $('slock').hidden = !auth.admin;
-    if (err.status === 401) adminStore.set('');
+    $('sform').hidden = true;
     sshow('err', esc(err.message));
   }
 }
-$('adminGo').addEventListener('click', () => { $('smsg').className = 'msg'; loadSettings(true); });
-$('adminPass').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('adminGo').click(); } });
-$('adminLock').addEventListener('click', () => { adminStore.set(''); $('adminPass').value = ''; $('sform').hidden = true; $('slock').hidden = false; settings = null; });
 
 function renderSettings() {
   const s = settings;
@@ -62,11 +47,13 @@ function renderSettings() {
   $('sSyncSrc').innerHTML = src(s.sheet.source.syncMode);
   $('supdated').textContent = s.updatedBy || s.updatedAt ? `Last changed${s.updatedBy ? ' by ' + s.updatedBy : ''}${s.updatedAt ? ', ' + when(s.updatedAt) : ''}.` : '';
   for (const id of ['sAiTest', 'sSheetTest']) $(id + 'Out').className = 'msg';
+  if (typeof renderAlerts === 'function') renderAlerts();
 }
 
 // Only what was changed is sent; empty key boxes keep the saved key
 function settingsPatch() {
   const s = settings, p = {};
+  if (!s) return p;
   if ($('sApproval').checked !== s.portal.requireApproval) p.portal = { requireApproval: $('sApproval').checked };
   const ai = {};
   if ($('sAiOn').checked !== s.ai.enabled) ai.enabled = $('sAiOn').checked;
@@ -82,6 +69,7 @@ function settingsPatch() {
   const mode = document.querySelector('input[name=sSyncMode]:checked')?.value;
   if (mode && mode !== s.sheet.syncMode) sh.syncMode = mode;
   if (Object.keys(sh).length) p.sheet = sh;
+  if (typeof alertsPatch === 'function') { const al = alertsPatch(); if (al) p.alerts = al; }
   return p;
 }
 
@@ -99,6 +87,7 @@ async function saveSettingsNow(patch, done) {
   }
 }
 $('sSave').addEventListener('click', () => {
+  if (!settings) return sshow('err', 'Settings are not loaded yet.');
   const p = settingsPatch();
   if (!Object.keys(p).length) return sshow('info', 'Nothing changed.');
   saveSettingsNow(p, 'Saved. It applies straight away.');
@@ -111,11 +100,11 @@ $('sSheetKeyDel').addEventListener('click', () => {
 });
 
 // Test what is saved (save first if something changed)
-async function runTest(path, outId, okText) {
+async function runTest(path, outId, okText, body = {}) {
   const out = $(outId);
   if (Object.keys(settingsPatch()).length) { out.className = 'msg err'; out.textContent = 'Save first, then test.'; return; }
   out.className = 'msg info'; out.textContent = 'Testing…';
-  try { const r = await adminApi(path, postJson({})); out.className = 'msg ok'; out.innerHTML = okText(r); }
+  try { const r = await adminApi(path, postJson(body)); out.className = 'msg ok'; out.innerHTML = okText(r); }
   catch (err) { out.className = 'msg err'; out.textContent = err.message; }
 }
 $('sAiTest').addEventListener('click', () => runTest('ui/settings/test-ai', 'sAiTestOut', r => `The key works with ${esc(r.name || r.model)}.`));

@@ -8,6 +8,8 @@
 //   lib/fields.js Jira's field list and which fields the form shows
 //   lib/ai.js     AI suggestions (optional)
 //   lib/sheet.js  Google Sheet sync through the Inbox (optional; lib/google.js talks to Google)
+//   lib/users.js  accounts and roles; lib/auth.js who is signed in (routes/auth.js signs in)
+//   lib/alerts.js Slack / Teams / webhook / email alerts; lib/dashboard.js the Dashboard's numbers
 //   lib/store.js  small key/value store that survives restarts
 //   lib/log.js    JSON log lines and the shared error reply shape
 //
@@ -17,9 +19,11 @@
 import express from 'express';
 import { missingEnv } from './lib/config.js';
 import { refreshSettings } from './lib/settings.js';
+import authRoutes from './routes/auth.js';
 import uiRoutes from './routes/ui.js';
 import portalRoutes from './routes/portal.js';
 import jiraRoutes from './routes/jira.js';
+import './lib/alerts.js'; // listens for failed sends, Inbox items and sheet failures
 
 export { missingEnv } from './lib/config.js';
 export { whoAmI } from './lib/jira.js';
@@ -38,4 +42,4 @@ app.get('/health', (_req, res) => res.json({ ok: !missingEnv.length }));
 // Settings saved in the page (re-read every 15 s, so all servers pick up a change)
 app.use((_req, _res, next) => refreshSettings().then(() => next(), () => next()));
 
-app.use(uiRoutes, portalRoutes, jiraRoutes);
+app.use(authRoutes, uiRoutes, portalRoutes, jiraRoutes);

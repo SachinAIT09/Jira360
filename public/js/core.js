@@ -27,18 +27,18 @@ for (const b of document.querySelectorAll('[data-theme-choice]')) b.addEventList
 darkQuery.addEventListener('change', () => { if (themeChoice() === 'system') applyTheme(); });
 applyTheme();
 
-$('passcode').value = store.get('jira.passcode', '');
-// Which passcodes the server asks for (start.js asks it first); none set = the boxes are hidden
-let auth = { passcode: true, admin: true };
-const passOk = () => !auth.passcode || !!$('passcode').value;
+// The signed-in person ({ email, name, role, mustChange }); start.js signs in and fills it
+let me = null;
+const passOk = () => !!me && !me.mustChange;
+const can = role => !!me && ['viewer', 'editor', 'admin'].indexOf(me.role) >= ['viewer', 'editor', 'admin'].indexOf(role);
 let project = 'Jira';
 
-// All calls to the server: adds the passcode, turns error replies and network failures into readable errors
+// All calls to the server: the session cookie goes by itself; X-J360 tells the server the call comes
+// from this page (other sites can't add it). Error replies and network failures become readable errors.
 async function api(path, opts = {}) {
   let res;
   try {
-    res = await fetch(path, { ...opts, headers: { ...(opts.headers || {}), 'X-UI-Passcode': $('passcode').value,
-      'X-User-Name': encodeURIComponent($('who').value.trim()) } });
+    res = await fetch(path, { credentials: 'same-origin', ...opts, headers: { ...(opts.headers || {}), 'X-J360': '1' } });
   } catch {
     throw new Error("Can't reach the server. Check that it is running.");
   }
@@ -46,46 +46,45 @@ async function api(path, opts = {}) {
   const out = await res.json().catch(() => ({ error: res.status === 404 || res.status === 405
     ? "This page can't find its Jira server. Open the form from the address where server.js runs (for example http://<that computer>:8080/)."
     : `HTTP ${res.status}` }));
-  if (!res.ok) throw Object.assign(new Error(out.error || `HTTP ${res.status}`), { status: res.status, errors: out.errors });
+  // Signed out meanwhile (expired, password changed elsewhere, account switched off): back to sign-in
+  if (res.status === 401 && me && !path.startsWith('ui/me/') && typeof sessionEnded === 'function') sessionEnded();
+  if (!res.ok) throw Object.assign(new Error(out.error || `HTTP ${res.status}`), { status: res.status, code: out.code, errors: out.errors });
   return out;
 }
 const postJson = body => ({ method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
 
 function needPass(show) {
   if (passOk()) return true;
-  show('err', 'Enter the passcode first.');
-  $('passcode').focus();
+  show('err', 'Sign in first.');
   return false;
 }
 
-// ---------- Your name (goes with every send, for the history) ----------
-$('who').value = store.get('jira.name', '');
-$('who').addEventListener('change', () => store.set('jira.name', $('who').value.trim()));
 // The history now lives on the server (Activity tab); drop what older versions kept in this browser
-try { localStorage.removeItem('jira.history'); localStorage.removeItem('jira.keys'); } catch {}
+try { for (const k of ['jira.history', 'jira.keys', 'jira.passcode', 'jira.name']) localStorage.removeItem(k); sessionStorage.removeItem('jira.admin'); } catch {}
 // After any send: the Activity tab, if open, shows it straight away
 function sent() { if (!$('activityPanel').hidden) loadActivity(); }
 
 // ---------- Tabs ----------
-const TABS = { single: ['tabSingle', 'singlePanel'], bulk: ['tabBulk', 'bulkPanel'], inbox: ['tabInbox', 'inboxPanel'], activity: ['tabActivity', 'activityPanel'], settings: ['tabSettings', 'settingsPanel'] };
+const TABS = { single: ['tabSingle', 'singlePanel'], bulk: ['tabBulk', 'bulkPanel'], inbox: ['tabInbox', 'inboxPanel'], dashboard: ['tabDashboard', 'dashPanel'], activity: ['tabActivity', 'activityPanel'], settings: ['tabSettings', 'settingsPanel'] };
 // Each section has its own address (#inbox, #settings…), so links, refresh and Back/Forward work.
 // how: 'push' (a click: a new history entry), 'replace' (opening the page), 'none' (Back/Forward)
 const tabFromHash = () => (TABS[location.hash.slice(1)] ? location.hash.slice(1) : '');
 function showTab(name, how = 'push') {
-  if (!TABS[name]) name = 'single';
+  if (!TABS[name] || (name === 'settings' && !can('admin')) || (name === 'bulk' && !can('editor'))) name = 'single';
   if (how !== 'none' && location.hash.slice(1) !== name) history[how === 'replace' ? 'replaceState' : 'pushState'](null, '', '#' + name);
   for (const [k, [tab, panel]] of Object.entries(TABS)) {
     $(panel).hidden = k !== name;
     $(tab).setAttribute('aria-selected', String(k === name));
   }
-  document.querySelector('main').classList.toggle('wide', name === 'bulk' || name === 'activity');
+  document.querySelector('main').classList.toggle('wide', name === 'bulk' || name === 'activity' || name === 'dashboard');
   store.set('jira.tab', name);
   if (name === 'inbox') loadInbox();
   if (name === 'activity') loadActivity();
   if (name === 'settings') loadSettings();
+  if (typeof dashTabShown === 'function') dashTabShown(name === 'dashboard');
 }
 for (const name of Object.keys(TABS)) $(TABS[name][0]).addEventListener('click', () => showTab(name));
-window.addEventListener('popstate', () => showTab(tabFromHash() || 'single', 'none'));
+window.addEventListener('popstate', () => { if (!tabFromHash() && location.hash) return; showTab(tabFromHash() || 'single', 'none'); }); // #main: the skip link
 
 // ---------- Lists from Jira (people, epics, sprints, versions, labels, priorities, statuses) ----------
 let opts = { users: [], parents: [], sprints: [], versions: [], labels: [], priorities: [], statuses: [] };
@@ -148,7 +147,7 @@ async function loadOptions() {
     loadFields(); // which fields the form shows (needs the people list for person fields)
     $('optsState').textContent = o.failed?.length ? `Couldn't load from Jira: ${o.failed.join(', ')}` : `Lists loaded from ${o.project}`;
   } catch (err) {
-    $('optsState').textContent = err.status === 401 ? 'Wrong passcode' : `Lists not loaded: ${err.message}`;
+    $('optsState').textContent = err.status === 401 ? 'Signed out' : `Lists not loaded: ${err.message}`;
   }
 }
 
